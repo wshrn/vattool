@@ -1,0 +1,35 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "Python 环境助手",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "systemTray": {
+      "iconPath": "icons/icon.png"
+    },
+    "windows": [
+      {
+        "title": "知攻系统-环境助手",
+        "width": 1000,
+        "height": 720,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "minWidth": 900,
+        "minHeight": 640,
+        "decorations": false
+      }
+    ],
+    "bundle": {
+      "active": true,
+      "targets": ["msi"],
+      "identifier": "com.zhigong.pythonenv"
+    }
+  }
+}
