@@ -1,0 +1,35 @@
+[package]
+name = "vattool"
+version = "0.1.0"
+edition = "2021"
+description = "Python 环境变量切换助手"
+authors = ["Vattool Team"]
+license = "MIT"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+ureq = { version = "2.9", features = ["tls"] }
+
+[dependencies]
+aes-gcm = "0.10"
+anyhow = "1.0"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde", "clock"] }
+get_if_addrs = "0.5"
+hostname = "0.3"
+once_cell = "1.19"
+parking_lot = "0.12"
+rand = "0.8"
+rsa = { version = "0.9", features = ["pem"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+thiserror = "1.0"
+tauri = { version = "1.5", features = ["dialog-message", "path-all", "process-exit", "shell-open"] }
+tokio = { version = "1.38", features = ["macros", "rt-multi-thread"] }
+uuid = { version = "1.8", features = ["v4", "serde"] }
+url = "2.5"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
+windows = { version = "0.52", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
