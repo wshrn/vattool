@@ -1,0 +1,36 @@
+{
+  "package": {
+    "productName": "Python Env Switcher",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "bundle": {
+      "identifier": "com.zhigong.python.env.switcher"
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "知攻系统-Python环境助手",
+        "width": 1200,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 700,
+        "center": true,
+        "decorations": false,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "build": {
+    "beforeBuildCommand": "pnpm install",
+    "beforeDevCommand": "pnpm install",
+    "devPath": "http://localhost:1420",
+    "distDir": "dist"
+  }
+}
