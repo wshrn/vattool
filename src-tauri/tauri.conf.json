@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/v1/schema.json",
+  "package": {
+    "productName": "PythonEnvTool",
+    "version": "0.1.0"
+  },
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist"
+  },
+  "tauri": {
+    "windows": [
+      {
+        "title": "知攻系统-Python环境助手",
+        "width": 1200,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 700,
+        "center": true,
+        "decorations": false,
+        "resizable": true,
+        "fullscreen": false,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false
+      }
+    ],
+    "bundle": {
+      "identifier": "com.zhigong.pythonenv",
+      "icon": [
+        "icons/icon.png"
+      ]
+    },
+    "allowlist": {
+      "all": true
+    },
+    "security": {
+      "csp": null
+    }
+  }
+}
