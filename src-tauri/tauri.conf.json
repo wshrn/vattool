@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "知攻系统 Python 工具",
+  "version": "0.1.0",
+  "identifier": "com.zhigong.python.tool",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist",
+    "devPath": "http://localhost:1420"
+  },
+  "app": {
+    "withGlobalTauri": true
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "dialog": {
+        "all": true
+      },
+      "window": {
+        "all": true
+      },
+      "path": {
+        "all": true
+      },
+      "fs": {
+        "readFile": true,
+        "writeFile": true
+      },
+      "shell": {
+        "all": true
+      },
+      "event": {
+        "all": true
+      }
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "知攻系统 - Python 环境助手",
+        "width": 1200,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 700,
+        "center": true,
+        "decorations": false,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false
+      }
+    ],
+    "bundle": {
+      "active": true,
+      "icon": [
+        "icons/app-icon.png"
+      ],
+      "targets": "all"
+    }
+  }
+}
