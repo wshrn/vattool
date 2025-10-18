@@ -1,81 +1,178 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-500 ease-apple">
+  <div class="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100 transition-colors duration-500 ease-apple tech-background">
+    <div class="pointer-events-none absolute inset-0">
+      <div class="absolute -left-40 -top-32 h-96 w-96 rounded-full bg-cyan-500/30 blur-3xl" />
+      <div class="absolute bottom-0 right-0 h-[28rem] w-[28rem] translate-x-1/3 translate-y-1/3 rounded-full bg-purple-500/25 blur-3xl" />
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.08),_transparent_60%)]" />
+    </div>
+
     <TitleBar />
-    <main class="max-w-4xl mx-auto px-6 py-10">
-      <section class="card-apple p-8 space-y-6 animate-slide-up">
-        <header class="space-y-2">
-          <h1 class="text-2xl font-semibold tracking-tight">Python 环境初始化助手</h1>
-          <p class="text-sm text-gray-600 dark:text-gray-400">在当前目录快速检测并初始化 Python 运行环境，同时支持国内常见镜像源配置。</p>
-        </header>
 
-        <div class="grid gap-3">
-          <div
-            v-for="item in statusLines"
-            :key="item.label"
-            class="result-item"
-            :class="item.status.ok ? 'success' : 'error'"
-          >
-            <p class="text-sm font-medium">{{ item.label }}</p>
-            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 whitespace-pre-line">
-              {{ item.status.message }}
-            </p>
-            <p v-if="item.status.detail" class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ item.status.detail }}</p>
-          </div>
+    <main class="relative mx-auto max-w-5xl px-6 py-16">
+      <section class="card-apple relative overflow-hidden p-10">
+        <div class="absolute inset-0 pointer-events-none">
+          <div class="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-purple-500/10 opacity-70" />
+          <div class="absolute -inset-px rounded-[1.85rem] border border-white/10" />
         </div>
 
-        <div class="space-y-3">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">选择默认 pip 国内镜像源</label>
-          <select
-            v-model="selectedMirror"
-            class="input-apple"
-            :disabled="initializing"
-          >
-            <option
-              v-for="mirror in mirrorOptions"
-              :key="mirror.value"
-              :value="mirror.value"
-            >
-              {{ mirror.label }} - {{ mirror.value }}
-            </option>
-          </select>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
-            将写入全局 <code>pip.ini</code> 配置，并自动加入对应的 trusted-host。
-          </p>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <div class="text-xs text-gray-500 dark:text-gray-400">
-            <p>当前 Python 路径：{{ status?.pythonPath ?? '未检测到' }}</p>
-            <p>Scripts 目录：{{ status?.scriptsPath ?? '未检测到' }}</p>
-            <p>当前镜像：{{ status?.pipMirrorConfigured.currentMirror ?? '未检测到' }}</p>
-          </div>
-          <button
-            class="btn-primary px-6 py-3 text-sm"
-            :disabled="initializing || loading"
-            @click="handleInitialize"
-          >
-            <span v-if="initializing" class="flex items-center space-x-2">
-              <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-              <span>正在初始化...</span>
+        <div class="relative space-y-8">
+          <header class="space-y-4">
+            <span class="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-1 text-[11px] font-medium tracking-[0.35em] text-cyan-200/80 uppercase">
+              Env Sync
             </span>
-            <span v-else>开始初始化</span>
-          </button>
-        </div>
+            <h1 class="text-3xl font-semibold leading-tight md:text-4xl">
+              Python 环境初始化助手
+            </h1>
+            <p class="max-w-3xl text-sm leading-relaxed text-slate-300/80">
+              在当前目录快速检测并初始化 Python 运行环境，自动校验 PATH、Scripts、pip 国内镜像等配置，并在初始化过程中提供实时反馈。
+            </p>
+          </header>
 
-        <transition-group name="list" tag="div" class="space-y-2">
-          <div
-            v-for="tip in notifications"
-            :key="tip.id"
-            class="notification"
-            :class="tip.type"
-          >
-            <p class="text-sm font-medium">{{ tip.title }}</p>
-            <p class="text-xs mt-1">{{ tip.message }}</p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <template v-if="loading">
+              <div
+                v-for="index in 5"
+                :key="`skeleton-${index}`"
+                class="result-item loading"
+              >
+                <div class="skeleton-bar h-3 w-24" />
+                <div class="skeleton-bar h-2 w-3/4" />
+                <div class="skeleton-bar h-2 w-1/2" />
+              </div>
+            </template>
+            <template v-else>
+              <div
+                v-for="item in statusLines"
+                :key="item.label"
+                class="result-item"
+                :class="item.status.ok ? 'success' : 'error'"
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <div class="space-y-2">
+                    <p class="text-sm font-semibold tracking-wide text-slate-100">
+                      {{ item.label }}
+                    </p>
+                    <p class="text-xs text-slate-300/80 whitespace-pre-line">
+                      {{ item.status.message }}
+                    </p>
+                    <p
+                      v-if="item.status.detail"
+                      class="text-xs text-slate-400/80"
+                    >
+                      {{ item.status.detail }}
+                    </p>
+                  </div>
+                  <span class="status-indicator" :class="item.status.ok ? 'success' : 'error'">
+                    <svg v-if="item.status.ok" class="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M5 13l4 4L19 7"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    <svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M15 9l-6 6m0-6l6 6"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+            </template>
           </div>
-        </transition-group>
+
+          <div class="space-y-4">
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold tracking-wide text-slate-100">选择默认 pip 国内镜像源</label>
+              <select
+                v-model="selectedMirror"
+                class="input-apple"
+                :disabled="initializing"
+              >
+                <option
+                  v-for="mirror in mirrorOptions"
+                  :key="mirror.value"
+                  :value="mirror.value"
+                >
+                  {{ mirror.label }} - {{ mirror.value }}
+                </option>
+              </select>
+              <p class="text-xs text-slate-400/80">
+                将写入全局 <code>pip.ini</code> 配置，并自动加入对应的 trusted-host。
+              </p>
+            </div>
+
+            <div class="info-panel grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-slate-200/90 md:grid-cols-3">
+              <div class="space-y-1">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400/70">Python</p>
+                <p class="font-mono text-[13px]">
+                  {{ status?.pythonPath ?? '未检测到' }}
+                </p>
+              </div>
+              <div class="space-y-1">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400/70">Scripts</p>
+                <p class="font-mono text-[13px]">
+                  {{ status?.scriptsPath ?? '未检测到' }}
+                </p>
+              </div>
+              <div class="space-y-1">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400/70">当前镜像</p>
+                <p class="font-mono text-[13px]">
+                  {{ status?.pipMirrorConfigured.currentMirror ?? '未检测到' }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            <div class="text-xs text-slate-400/80">
+              <p>初始化会在后台自动写入配置，操作完成后可立即使用。</p>
+              <p>如需恢复默认镜像，可再次运行并选择其他源。</p>
+            </div>
+            <button
+              class="btn-primary"
+              :disabled="initializing || loading"
+              @click="handleInitialize"
+            >
+              <span v-if="initializing" class="flex items-center gap-2">
+                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" />
+                  <path class="opacity-80" fill="currentColor" d="M12 3a9 9 0 018.66 6.5l-3.77 1A5 5 0 0012 7z" />
+                </svg>
+                <span>正在初始化...</span>
+              </span>
+              <span v-else class="flex items-center gap-2">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M4 12h6l2-3 2 6 2-3h4"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span>开始初始化</span>
+              </span>
+            </button>
+          </div>
+
+          <transition-group name="list" tag="div" class="space-y-2">
+            <div
+              v-for="tip in notifications"
+              :key="tip.id"
+              class="notification"
+              :class="tip.type"
+            >
+              <p class="text-sm font-medium">{{ tip.title }}</p>
+              <p class="text-xs mt-1 text-slate-200/90">{{ tip.message }}</p>
+            </div>
+          </transition-group>
+        </div>
       </section>
     </main>
   </div>
