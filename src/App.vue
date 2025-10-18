@@ -37,7 +37,7 @@
         </div>
       </section>
 
-      <section class="panel-section">
+      <section class="panel-section panel-section--mirrors">
         <div class="panel-section__title-wrap">
           <h2 class="panel-section__title">镜像智能切换</h2>
           <p class="panel-section__hint">自适配可信镜像，保持依赖分发稳定。</p>
