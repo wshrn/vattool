@@ -1,13 +1,16 @@
 <template>
   <div ref="appShellRef" class="app-shell">
     <TitleBar ref="titleBarRef" />
-    <main ref="contentAreaRef" class="relative flex w-full justify-center px-6 py-6">
+    <main
+      ref="contentAreaRef"
+      class="relative mx-auto flex w-full max-w-3xl flex-col px-6 py-8"
+    >
       <div aria-hidden="true" class="pointer-events-none absolute inset-0">
         <div class="absolute -top-24 right-0 h-64 w-64 rounded-full bg-gradient-to-br from-sky-400/40 via-blue-500/30 to-purple-500/40 blur-3xl"></div>
         <div class="absolute bottom-[-80px] left-[-120px] h-72 w-72 rounded-full bg-gradient-to-br from-emerald-400/30 via-cyan-400/20 to-transparent blur-3xl"></div>
         <div class="absolute top-1/2 left-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-white/40 via-blue-100/20 to-transparent blur-2xl dark:from-slate-500/30 dark:via-blue-500/20"></div>
       </div>
-      <section ref="cardRef" class="card-apple w-full max-w-3xl space-y-8">
+      <section ref="cardRef" class="card-apple w-full space-y-8">
         <header class="space-y-2">
           <span class="inline-flex items-center rounded-full bg-blue-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">
             Smart Environment Toolkit
@@ -262,9 +265,14 @@ const synchronizeWindowSize = () => {
     const titleBarHeight = titleBarRect?.height ?? 0
     const titleBarWidth = titleBarElement?.scrollWidth ?? titleBarRect?.width ?? 0
 
-    const contentWidth = cardRect.width + paddingX
-    const contentHeight = cardRect.height + paddingY + titleBarHeight
-    const verticalBuffer = 16
+    const cardWidthWithPadding = cardRect.width + paddingX
+    const cardHeightWithPadding = cardRect.height + paddingY
+    const scrollWidth = contentAreaRef.value?.scrollWidth ?? cardWidthWithPadding
+    const scrollHeight = contentAreaRef.value?.scrollHeight ?? cardHeightWithPadding
+
+    const contentWidth = Math.max(cardWidthWithPadding, scrollWidth)
+    const contentHeight = Math.max(cardHeightWithPadding, scrollHeight) + titleBarHeight
+    const verticalBuffer = 32
 
     const width = Math.ceil(Math.max(contentWidth, titleBarWidth))
     const height = Math.ceil(contentHeight + verticalBuffer)
