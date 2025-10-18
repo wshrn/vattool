@@ -151,11 +151,15 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
     if combined.len() <= 12 {
         return Err(OfflineKeyError::InvalidData("离线时间数据损坏".into()));
     }
-    let (nonce, ciphertext) = combined.split_at(12);
+    let (nonce_bytes, ciphertext) = combined.split_at(12);
     let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
+    let nonce_array: [u8; 12] = nonce_bytes
+        .try_into()
+        .map_err(|_| OfflineKeyError::InvalidData("离线时间数据损坏".into()))?;
+    let nonce = Nonce::from(nonce_array);
     let plaintext = cipher
-        .decrypt(Nonce::from_slice(nonce), ciphertext)
+        .decrypt(&nonce, ciphertext)
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 解密失败: {err}")))?;
     let time_str = String::from_utf8(plaintext)
         .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()))?;
@@ -169,11 +173,13 @@ fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
     let mut nonce_bytes = [0u8; 12];
     OsRng.fill_bytes(&mut nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
     let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce_bytes), now.to_rfc3339().as_bytes())
+        .encrypt(&nonce, now.to_rfc3339().as_bytes())
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
+    let nonce_bytes = nonce.as_ref();
     let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
-    combined.extend_from_slice(&nonce_bytes);
+    combined.extend_from_slice(nonce_bytes);
     combined.extend_from_slice(&ciphertext);
     Ok(general_purpose::STANDARD.encode(combined))
 }
