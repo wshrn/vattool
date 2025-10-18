@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '../utils/runtime'
+import { showDialogMessage } from '../utils/dialog'
 export interface OfflineLicensePayload {
   userId: number
   username: string
@@ -14,17 +15,6 @@ export interface OfflineKeyValidationResult {
   reason?: string
   expiresAt?: string
   payload?: OfflineLicensePayload
-}
-
-const tauriMessage = async (content: string, options: { title: string; type: 'info' | 'error' | 'warning' | 'success' }) => {
-  if (!isTauri()) {
-    alert(`${options.title}: ${content}`)
-    return
-  }
-  const dialog = (window as any).__TAURI__?.dialog
-  if (dialog?.message) {
-    await dialog.message(content, options)
-  }
 }
 
 const tauriExit = async (code: number) => {
@@ -54,7 +44,7 @@ export const ensureOfflineLicense = async (): Promise<boolean> => {
       const reason = result.reason ?? '离线密钥无效'
       const expiresAt = result.expiresAt ? `\n到期时间：${result.expiresAt}` : ''
       console.error(`离线密钥校验失败：${reason}${expiresAt}`)
-      await tauriMessage(`认证失败：${reason}${expiresAt}`, { title: '认证失败', type: 'error' })
+      await showDialogMessage(`认证失败：${reason}${expiresAt}`, { title: '认证失败', type: 'error' })
       await tauriExit(0)
       return false
     }
@@ -62,7 +52,7 @@ export const ensureOfflineLicense = async (): Promise<boolean> => {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     console.error(`离线密钥校验失败：${detail}`)
-    await tauriMessage(`认证失败：${detail}`, { title: '认证失败', type: 'error' })
+    await showDialogMessage(`认证失败：${detail}`, { title: '认证失败', type: 'error' })
     await tauriExit(0)
     return false
   }
