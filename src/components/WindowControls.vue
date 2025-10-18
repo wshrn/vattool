@@ -1,28 +1,31 @@
 <template>
-  <div class="flex items-center space-x-1">
+  <div class="app-window-controls">
     <button
-      class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+      class="titlebar-button"
+      title="最小化"
       @click.stop.prevent="minimize"
       @mousedown.stop
     >
-      <MinusIcon class="w-4 h-4 text-gray-600 dark:text-gray-300" />
+      <MinusIcon class="w-4 h-4" />
     </button>
     <button
-      class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+      class="titlebar-button"
+      title="最大化/还原"
       @click.stop.prevent="toggleMaximize"
       @mousedown.stop
     >
       <Squares2X2Icon
         v-if="!isMaximized"
-        class="w-4 h-4 text-gray-600 dark:text-gray-300"
+        class="w-4 h-4"
       />
       <Squares2X2Icon
         v-else
-        class="w-4 h-4 text-gray-600 dark:text-gray-300 rotate-45"
+        class="w-4 h-4 rotate-45"
       />
     </button>
     <button
-      class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-500 hover:text-white"
+      class="titlebar-button titlebar-button--danger"
+      title="关闭"
       @click.stop.prevent="closeWindow"
       @mousedown.stop
     >

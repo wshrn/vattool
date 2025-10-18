@@ -1,6 +1,7 @@
 <template>
   <button
-    class="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+    class="titlebar-button"
+    :class="{ 'is-active': isDark }"
     :title="`当前主题：${themeLabel}`"
     @click="toggleTheme"
   >
