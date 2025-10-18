@@ -2,7 +2,7 @@ use crate::FileWriteLock;
 use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Map, Value};
 use std::{collections::HashMap, fs, path::PathBuf};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 pub const TOOLBOX_THEME_ENV_NAME: &str = "ZHIGONG_TOOLBOX_THEME";
 const CONFIG_FILE_NAME: &str = "settings.json";
