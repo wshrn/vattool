@@ -33,8 +33,9 @@ fn ensure_icon() -> Result<(), Box<dyn std::error::Error>> {
 
 fn download_icon(url: &str, destination: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let response = ureq::get(url).call()?;
-    if !response.ok() {
-        return Err(format!("download failed with status {}", response.status()).into());
+    let status = response.status();
+    if !(200..=299).contains(&status) {
+        return Err(format!("download failed with status {}", status).into());
     }
     let mut reader = response.into_reader();
     let mut buf = Vec::new();
