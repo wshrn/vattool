@@ -1,82 +1,111 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-500 ease-apple">
+  <div class="app-shell">
+    <span class="app-shell__glow app-shell__glow--primary" aria-hidden="true" />
+    <span class="app-shell__glow app-shell__glow--secondary" aria-hidden="true" />
     <TitleBar />
-    <main class="max-w-4xl mx-auto px-6 py-10">
-      <section class="card-apple p-8 space-y-6 animate-slide-up">
-        <header class="space-y-2">
-          <h1 class="text-2xl font-semibold tracking-tight">Python 环境初始化助手</h1>
-          <p class="text-sm text-gray-600 dark:text-gray-400">在当前目录快速检测并初始化 Python 运行环境，同时支持国内常见镜像源配置。</p>
-        </header>
+    <main class="app-panel">
+      <header class="panel-header">
+        <div class="panel-header__meta">
+          <span class="panel-chip">Environment Sync</span>
+          <span class="panel-header__pulse" />
+        </div>
+        <div>
+          <h1 class="panel-title">Python 环境初始化助手</h1>
+          <p class="panel-subtitle">一键侦测并智能修复 Python 运行环境，快速接入国内高可用镜像源。</p>
+        </div>
+      </header>
 
-        <div class="grid gap-3">
-          <div
+      <section class="panel-section">
+        <h2 class="panel-section__title">状态诊断</h2>
+        <div class="status-grid">
+          <article
             v-for="item in statusLines"
             :key="item.label"
-            class="result-item"
-            :class="item.status.ok ? 'success' : 'error'"
+            class="status-card"
+            :class="item.status.ok ? 'status-card--ok' : 'status-card--error'"
           >
-            <p class="text-sm font-medium">{{ item.label }}</p>
-            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 whitespace-pre-line">
-              {{ item.status.message }}
-            </p>
-            <p v-if="item.status.detail" class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ item.status.detail }}</p>
-          </div>
+            <div class="status-card__icon" aria-hidden="true">
+              <span class="status-card__beam" />
+              <span class="status-card__dot" />
+            </div>
+            <div>
+              <p class="status-card__label">{{ item.label }}</p>
+              <p class="status-card__message">{{ item.status.message }}</p>
+              <p v-if="item.status.detail" class="status-card__detail">{{ item.status.detail }}</p>
+            </div>
+          </article>
         </div>
-
-        <div class="space-y-3">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">选择默认 pip 国内镜像源</label>
-          <select
-            v-model="selectedMirror"
-            class="input-apple"
-            :disabled="initializing"
-          >
-            <option
-              v-for="mirror in mirrorOptions"
-              :key="mirror.value"
-              :value="mirror.value"
-            >
-              {{ mirror.label }} - {{ mirror.value }}
-            </option>
-          </select>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
-            将写入全局 <code>pip.ini</code> 配置，并自动加入对应的 trusted-host。
-          </p>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <div class="text-xs text-gray-500 dark:text-gray-400">
-            <p>当前 Python 路径：{{ status?.pythonPath ?? '未检测到' }}</p>
-            <p>Scripts 目录：{{ status?.scriptsPath ?? '未检测到' }}</p>
-            <p>当前镜像：{{ status?.pipMirrorConfigured.currentMirror ?? '未检测到' }}</p>
-          </div>
-          <button
-            class="btn-primary px-6 py-3 text-sm"
-            :disabled="initializing || loading"
-            @click="handleInitialize"
-          >
-            <span v-if="initializing" class="flex items-center space-x-2">
-              <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-              <span>正在初始化...</span>
-            </span>
-            <span v-else>开始初始化</span>
-          </button>
-        </div>
-
-        <transition-group name="list" tag="div" class="space-y-2">
-          <div
-            v-for="tip in notifications"
-            :key="tip.id"
-            class="notification"
-            :class="tip.type"
-          >
-            <p class="text-sm font-medium">{{ tip.title }}</p>
-            <p class="text-xs mt-1">{{ tip.message }}</p>
-          </div>
-        </transition-group>
       </section>
+
+      <section class="panel-section">
+        <div class="panel-section__title-wrap">
+          <h2 class="panel-section__title">镜像智能切换</h2>
+          <p class="panel-section__hint">自适配可信镜像，保持依赖分发稳定。</p>
+        </div>
+        <div class="mirror-select">
+          <label class="mirror-select__label">选择默认 pip 国内镜像源</label>
+          <div class="mirror-select__control">
+            <select
+              v-model="selectedMirror"
+              class="mirror-select__input"
+              :disabled="initializing"
+            >
+              <option
+                v-for="mirror in mirrorOptions"
+                :key="mirror.value"
+                :value="mirror.value"
+              >
+                {{ mirror.label }} — {{ mirror.value }}
+              </option>
+            </select>
+            <span class="mirror-select__border" aria-hidden="true" />
+          </div>
+          <p class="mirror-select__note">系统将写入全局 <code>pip.ini</code> 并同步 trusted-host。</p>
+        </div>
+      </section>
+
+      <footer class="panel-footer">
+        <dl class="panel-meta">
+          <div>
+            <dt>当前 Python 路径</dt>
+            <dd>{{ status?.pythonPath ?? '未检测到' }}</dd>
+          </div>
+          <div>
+            <dt>Scripts 目录</dt>
+            <dd>{{ status?.scriptsPath ?? '未检测到' }}</dd>
+          </div>
+          <div>
+            <dt>当前镜像</dt>
+            <dd>{{ status?.pipMirrorConfigured.currentMirror ?? '未检测到' }}</dd>
+          </div>
+        </dl>
+        <button
+          class="btn-primary panel-action"
+          :disabled="initializing || loading"
+          @click="handleInitialize"
+        >
+          <span v-if="initializing" class="panel-action__loading">
+            <svg class="panel-action__spinner" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
+            <span>正在初始化...</span>
+          </span>
+          <span v-else>开始初始化</span>
+        </button>
+      </footer>
+
+      <transition-group name="list" tag="div" class="notification-stack">
+        <div
+          v-for="tip in notifications"
+          :key="tip.id"
+          class="notification"
+          :class="tip.type"
+        >
+          <p class="notification__title">{{ tip.title }}</p>
+          <p class="notification__message">{{ tip.message }}</p>
+        </div>
+      </transition-group>
     </main>
   </div>
 </template>
