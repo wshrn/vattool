@@ -11,8 +11,8 @@ fn main() {
 
 fn ensure_icon() -> Result<(), Box<dyn std::error::Error>> {
     const ICON_URLS: &[&str] = &[
-        "https://mirrors.aliyun.com/pypi/static/images/favicon.ico",
-        "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/favicon.ico",
+        "https://www.python.org/static/favicon.ico",
+        "https://raw.githubusercontent.com/python/cpython/main/Misc/python.ico",
     ];
 
     let icon_dir = Path::new("icons");
