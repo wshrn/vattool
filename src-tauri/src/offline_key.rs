@@ -178,7 +178,7 @@ fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
     let ciphertext = cipher
         .encrypt(&nonce, now.to_rfc3339().as_bytes())
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
-    let nonce_bytes = nonce.as_ref();
+    let nonce_bytes: &[u8] = nonce.as_ref();
     let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
     combined.extend_from_slice(nonce_bytes);
     combined.extend_from_slice(&ciphertext);
