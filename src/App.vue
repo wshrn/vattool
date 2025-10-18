@@ -44,37 +44,11 @@
         </div>
         <div class="mirror-select">
           <label class="mirror-select__label">选择默认 pip 国内镜像源</label>
-          <div class="mirror-select__control">
-            <span class="mirror-select__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <circle cx="12" cy="12" r="6.75" opacity="0.4" />
-                <path
-                  d="M4.75 12h14.5M12 4.75c2.5 2.15 2.5 10.35 0 14.5M12 4.75c-2.5 2.15-2.5 10.35 0 14.5"
-                  stroke-linecap="round"
-                />
-              </svg>
-            </span>
-            <select
-              v-model="selectedMirror"
-              class="mirror-select__input"
-              :disabled="initializing"
-            >
-              <option
-                v-for="mirror in mirrorOptions"
-                :key="mirror.value"
-                :value="mirror.value"
-              >
-                {{ mirror.label }} — {{ mirror.value }}
-              </option>
-            </select>
-            <span class="mirror-select__chevron" aria-hidden="true">
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M6 8l4 4 4-4" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-            <span class="mirror-select__shine" aria-hidden="true" />
-            <span class="mirror-select__border" aria-hidden="true" />
-          </div>
+          <MirrorDropdown
+            v-model="selectedMirror"
+            :options="mirrorOptions"
+            :disabled="initializing"
+          />
           <p class="mirror-select__note">系统将写入全局 <code>pip.ini</code> 并同步 trusted-host。</p>
         </div>
       </section>
@@ -143,6 +117,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import TitleBar from './components/TitleBar.vue'
+import MirrorDropdown from './components/MirrorDropdown.vue'
 import { fetchPythonEnvStatus, initializePythonEnvironment, type PythonEnvStatus } from './services/pythonEnv'
 
 const status = ref<PythonEnvStatus | null>(null)
