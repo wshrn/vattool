@@ -1,7 +1,7 @@
 <template>
   <div ref="appShellRef" class="app-shell">
     <TitleBar />
-    <main class="relative flex justify-center px-6 py-6">
+    <main ref="mainRef" class="relative flex justify-center px-6 py-6">
       <div aria-hidden="true" class="pointer-events-none absolute inset-0">
         <div class="absolute -top-24 right-0 h-64 w-64 rounded-full bg-gradient-to-br from-sky-400/40 via-blue-500/30 to-purple-500/40 blur-3xl"></div>
         <div class="absolute bottom-[-80px] left-[-120px] h-72 w-72 rounded-full bg-gradient-to-br from-emerald-400/30 via-cyan-400/20 to-transparent blur-3xl"></div>
@@ -111,6 +111,7 @@ const selectedMirror = ref('https://pypi.tuna.tsinghua.edu.cn/simple')
 const notifications = reactive<NotificationItem[]>([])
 let notificationSeed = 0
 const appShellRef = ref<HTMLElement | null>(null)
+const mainRef = ref<HTMLElement | null>(null)
 const cardRef = ref<HTMLElement | null>(null)
 const appWindow = getCurrentWindow()
 let resizeObserver: ResizeObserver | null = null
@@ -237,13 +238,26 @@ const synchronizeWindowSize = () => {
     cancelAnimationFrame(resizeAnimationFrame)
   }
 
-  const element = cardRef.value ?? appShellRef.value
-
   resizeAnimationFrame = requestAnimationFrame(async () => {
-    const shellRect = appShellRef.value!.getBoundingClientRect()
-    const cardRect = element.getBoundingClientRect()
-    const width = Math.ceil(Math.max(shellRect.width, cardRect.width))
-    const height = Math.ceil(shellRect.height)
+    const shellElement = appShellRef.value!
+    const titleBarElement = shellElement.querySelector('.titlebar') as HTMLElement | null
+    const mainElement = mainRef.value ?? (shellElement.querySelector('main') as HTMLElement | null)
+    const cardElement = cardRef.value
+
+    const contentWidthCandidates = [
+      shellElement.offsetWidth,
+      mainElement?.offsetWidth ?? 0,
+      cardElement?.offsetWidth ?? 0,
+    ].filter((value) => Number.isFinite(value) && value > 0)
+
+    const fallbackWidth = shellElement.getBoundingClientRect().width
+
+    const titleHeight = titleBarElement?.offsetHeight ?? 0
+    const mainHeight = mainElement?.offsetHeight ?? 0
+    const fallbackHeight = shellElement.offsetHeight
+
+    const width = Math.ceil(Math.max(fallbackWidth, ...contentWidthCandidates))
+    const height = Math.ceil(Math.max(titleHeight + mainHeight, fallbackHeight) + 16)
 
     try {
       const size = new LogicalSize(width, height)
