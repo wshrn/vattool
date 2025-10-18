@@ -1,79 +1,128 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-500 ease-apple">
-    <TitleBar />
-    <main class="max-w-4xl mx-auto px-6 py-10">
-      <section class="card-apple p-8 space-y-6 animate-slide-up">
-        <header class="space-y-2">
-          <h1 class="text-2xl font-semibold tracking-tight">Python 环境初始化助手</h1>
-          <p class="text-sm text-gray-600 dark:text-gray-400">在当前目录快速检测并初始化 Python 运行环境，同时支持国内常见镜像源配置。</p>
+  <div class="app-shell">
+    <div class="app-background" aria-hidden="true">
+      <div class="app-grid"></div>
+      <div class="app-glow app-glow--primary"></div>
+      <div class="app-glow app-glow--secondary"></div>
+    </div>
+
+    <TitleBar class="relative z-20" />
+
+    <main class="app-main relative z-10">
+      <section class="fusion-panel animate-slide-up">
+        <header class="panel-header">
+          <span class="panel-badge">Environment Pilot</span>
+          <h1 class="panel-title">Python 环境初始化助手</h1>
+          <p class="panel-subtitle">在当前目录快速检测与初始化 Python 运行环境，一键完成变量配置与镜像同步。</p>
         </header>
 
-        <div class="grid gap-3">
-          <div
-            v-for="item in statusLines"
-            :key="item.label"
-            class="result-item"
-            :class="item.status.ok ? 'success' : 'error'"
-          >
-            <p class="text-sm font-medium">{{ item.label }}</p>
-            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 whitespace-pre-line">
-              {{ item.status.message }}
-            </p>
-            <p v-if="item.status.detail" class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ item.status.detail }}</p>
+        <div class="status-wrapper" role="status" aria-live="polite">
+          <div v-if="loading" class="status-grid">
+            <div v-for="placeholder in 5" :key="`placeholder-${placeholder}`" class="status-card skeleton-card"></div>
           </div>
-        </div>
-
-        <div class="space-y-3">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">选择默认 pip 国内镜像源</label>
-          <select
-            v-model="selectedMirror"
-            class="input-apple"
-            :disabled="initializing"
-          >
-            <option
-              v-for="mirror in mirrorOptions"
-              :key="mirror.value"
-              :value="mirror.value"
+          <div v-else-if="statusItems.length > 0" class="status-grid">
+            <article
+              v-for="item in statusItems"
+              :key="item.label"
+              class="status-card"
+              :class="item.tone"
             >
-              {{ mirror.label }} - {{ mirror.value }}
-            </option>
-          </select>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
-            将写入全局 <code>pip.ini</code> 配置，并自动加入对应的 trusted-host。
-          </p>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <div class="text-xs text-gray-500 dark:text-gray-400">
-            <p>当前 Python 路径：{{ status?.pythonPath ?? '未检测到' }}</p>
-            <p>Scripts 目录：{{ status?.scriptsPath ?? '未检测到' }}</p>
-            <p>当前镜像：{{ status?.pipMirrorConfigured.currentMirror ?? '未检测到' }}</p>
+              <div class="status-card__beam"></div>
+              <div class="status-card__icon" :class="item.tone">
+                <component :is="item.icon" class="w-5 h-5" />
+              </div>
+              <div class="status-card__content">
+                <p class="status-card__title">{{ item.label }}</p>
+                <p class="status-card__message">{{ item.status.message }}</p>
+                <p v-if="item.status.detail" class="status-card__detail">{{ item.status.detail }}</p>
+              </div>
+            </article>
           </div>
-          <button
-            class="btn-primary px-6 py-3 text-sm"
-            :disabled="initializing || loading"
-            @click="handleInitialize"
-          >
-            <span v-if="initializing" class="flex items-center space-x-2">
-              <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-              <span>正在初始化...</span>
-            </span>
-            <span v-else>开始初始化</span>
-          </button>
+          <p v-else class="status-empty">暂未获取到环境状态，请稍后重试或检查控制台日志。</p>
         </div>
 
-        <transition-group name="list" tag="div" class="space-y-2">
+        <section class="panel-section">
+          <div class="panel-section__header">
+            <h2 class="section-title">镜像加速配置</h2>
+            <p class="section-description">选择一个常用的国内镜像，加速依赖下载并自动写入 trusted-host。</p>
+          </div>
+
+          <div class="mirror-control">
+            <select
+              v-model="selectedMirror"
+              class="input-apple"
+              :disabled="initializing || loading"
+            >
+              <option
+                v-for="mirror in mirrorOptions"
+                :key="mirror.value"
+                :value="mirror.value"
+              >
+                {{ mirror.label }} · {{ mirror.value }}
+              </option>
+            </select>
+
+            <button
+              class="btn-apple btn-primary"
+              :disabled="initializing || loading"
+              @click="handleInitialize"
+            >
+              <span v-if="initializing" class="btn-primary__loading">
+                <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                <span>正在初始化</span>
+              </span>
+              <span v-else>写入镜像配置</span>
+            </button>
+          </div>
+
+          <div v-if="activeMirror" class="trusted-hosts">
+            <span class="trusted-hosts__label">Trusted Host</span>
+            <ul class="trusted-hosts__list">
+              <li
+                v-for="host in activeMirror.trustedHosts"
+                :key="host"
+                class="trusted-hosts__chip"
+              >
+                {{ host }}
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="panel-section__header">
+            <h2 class="section-title">当前环境速览</h2>
+            <p class="section-description">实时展示 Python 与 Pip 的路径信息，确保配置一目了然。</p>
+          </div>
+
+          <div class="meta-grid">
+            <div class="meta-card">
+              <span class="meta-card__label">Python 路径</span>
+              <p class="meta-card__value">{{ status?.pythonPath ?? '未检测到' }}</p>
+            </div>
+            <div class="meta-card">
+              <span class="meta-card__label">Scripts 目录</span>
+              <p class="meta-card__value">{{ status?.scriptsPath ?? '未检测到' }}</p>
+            </div>
+            <div class="meta-card">
+              <span class="meta-card__label">当前镜像源</span>
+              <p class="meta-card__value">{{ status?.pipMirrorConfigured.currentMirror ?? '未检测到' }}</p>
+            </div>
+          </div>
+        </section>
+
+        <transition-group name="list" tag="div" class="notification-stack">
           <div
             v-for="tip in notifications"
             :key="tip.id"
             class="notification"
             :class="tip.type"
           >
-            <p class="text-sm font-medium">{{ tip.title }}</p>
-            <p class="text-xs mt-1">{{ tip.message }}</p>
+            <p class="notification__title">{{ tip.title }}</p>
+            <p class="notification__message">{{ tip.message }}</p>
           </div>
         </transition-group>
       </section>
@@ -82,9 +131,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, type Component } from 'vue'
+import { CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import TitleBar from './components/TitleBar.vue'
-import { fetchPythonEnvStatus, initializePythonEnvironment, type PythonEnvStatus } from './services/pythonEnv'
+import {
+  fetchPythonEnvStatus,
+  initializePythonEnvironment,
+  type PythonEnvStatus,
+  type StatusLine,
+  type MirrorOption,
+} from './services/pythonEnv'
 
 interface NotificationItem {
   id: number
@@ -100,13 +156,16 @@ const selectedMirror = ref('https://pypi.tuna.tsinghua.edu.cn/simple')
 const notifications = reactive<NotificationItem[]>([])
 let notificationSeed = 0
 
-const mirrorOptions = computed(() => status.value?.mirrorCandidates ?? [
-  {
-    label: '清华大学 TUNA',
-    value: 'https://pypi.tuna.tsinghua.edu.cn/simple',
-    trustedHosts: ['pypi.tuna.tsinghua.edu.cn'],
-  },
-])
+const mirrorOptions = computed<MirrorOption[]>(
+  () =>
+    status.value?.mirrorCandidates ?? [
+      {
+        label: '清华大学 TUNA',
+        value: 'https://pypi.tuna.tsinghua.edu.cn/simple',
+        trustedHosts: ['pypi.tuna.tsinghua.edu.cn'],
+      },
+    ],
+)
 
 const statusLines = computed(() => {
   if (!status.value) {
@@ -120,6 +179,23 @@ const statusLines = computed(() => {
     { label: 'Pip 镜像配置', status: status.value.pipMirrorConfigured },
   ]
 })
+
+interface StatusItem {
+  label: string
+  status: StatusLine
+  tone: 'positive' | 'alert'
+  icon: Component
+}
+
+const statusItems = computed<StatusItem[]>(() =>
+  statusLines.value.map((item) => ({
+    ...item,
+    tone: item.status.ok ? 'positive' : 'alert',
+    icon: item.status.ok ? CheckCircleIcon : ExclamationTriangleIcon,
+  })),
+)
+
+const activeMirror = computed(() => mirrorOptions.value.find((item) => item.value === selectedMirror.value) ?? null)
 
 const pushNotification = (item: Omit<NotificationItem, 'id'>) => {
   const id = ++notificationSeed
