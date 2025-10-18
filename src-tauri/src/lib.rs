@@ -16,7 +16,8 @@ pub fn run() {
             python_env::get_python_environment_status,
             python_env::initialize_python_environment,
             config::tool_read_theme,
-            config::save_config
+            config::save_config,
+            config::sync_theme_env
         ])
         .setup(|app| {
             let handle = app.handle();

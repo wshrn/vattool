@@ -112,3 +112,45 @@ pub fn save_config(
 pub fn emit_theme_update(app: &tauri::AppHandle) {
     let _ = app.emit("theme-changed", HashMap::<String, String>::new());
 }
+
+#[tauri::command]
+pub fn sync_theme_env(value: String) -> Result<(), String> {
+    sync_theme_env_impl(&value).map_err(|err| err.to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn sync_theme_env_impl(value: &str) -> Result<()> {
+    use windows::core::w;
+    use windows::Win32::Foundation::{LPARAM, WPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
+    };
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+
+    let sanitized = sanitize_theme(value);
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let (env, _) = hkcu.create_subkey("Environment")?;
+    env.set_value(TOOLBOX_THEME_ENV_NAME, &sanitized)?;
+
+    unsafe {
+        let param = w!("Environment");
+        let _ = SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            WPARAM::default(),
+            LPARAM(param.as_ptr() as isize),
+            SMTO_ABORTIFHUNG,
+            5000,
+            None,
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn sync_theme_env_impl(value: &str) -> Result<()> {
+    std::env::set_var(TOOLBOX_THEME_ENV_NAME, sanitize_theme(value));
+    Ok(())
+}
