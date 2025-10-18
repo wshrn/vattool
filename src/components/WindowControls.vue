@@ -1,32 +1,32 @@
 <template>
-  <div class="flex items-center space-x-1">
+  <div class="window-controls">
     <button
-      class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+      class="window-control"
       @click.stop.prevent="minimize"
       @mousedown.stop
     >
-      <MinusIcon class="w-4 h-4 text-gray-600 dark:text-gray-300" />
+      <MinusIcon class="h-4 w-4" />
     </button>
     <button
-      class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+      class="window-control"
       @click.stop.prevent="toggleMaximize"
       @mousedown.stop
     >
       <Squares2X2Icon
         v-if="!isMaximized"
-        class="w-4 h-4 text-gray-600 dark:text-gray-300"
+        class="h-4 w-4"
       />
       <Squares2X2Icon
         v-else
-        class="w-4 h-4 text-gray-600 dark:text-gray-300 rotate-45"
+        class="h-4 w-4 rotate-45"
       />
     </button>
     <button
-      class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-500 hover:text-white"
+      class="window-control window-control--danger"
       @click.stop.prevent="closeWindow"
       @mousedown.stop
     >
-      <XMarkIcon class="w-4 h-4" />
+      <XMarkIcon class="h-4 w-4" />
     </button>
   </div>
 </template>
