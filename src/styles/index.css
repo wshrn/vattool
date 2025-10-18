@@ -6,41 +6,11 @@
   :root {
     --app-surface-bg: #ffffff;
     --app-surface-border: #e5e7eb;
-    --slider-accent: #3b82f6;
-    --slider-track-gradient-start: rgba(59, 130, 246, 0.35);
-    --slider-track-gradient-end: rgba(59, 130, 246, 0.2);
-    --slider-track-gradient-hover-start: rgba(59, 130, 246, 0.55);
-    --slider-track-gradient-hover-end: rgba(59, 130, 246, 0.32);
-    --slider-track-border: rgba(59, 130, 246, 0.18);
-    --slider-track-disabled-start: rgba(148, 163, 184, 0.25);
-    --slider-track-disabled-end: rgba(148, 163, 184, 0.2);
-    --slider-thumb-bg: #ffffff;
-    --slider-thumb-border: rgba(59, 130, 246, 0.5);
-    --slider-thumb-shadow: 0 6px 18px rgba(37, 99, 235, 0.25);
-    --slider-thumb-hover-shadow: 0 8px 22px rgba(37, 99, 235, 0.35);
-    --slider-thumb-disabled-bg: #f3f4f6;
-    --slider-thumb-disabled-border: rgba(148, 163, 184, 0.6);
-    --slider-focus-ring: rgba(59, 130, 246, 0.25);
   }
 
   html.dark {
     --app-surface-bg: #1f2937;
     --app-surface-border: #374151;
-    --slider-accent: #60a5fa;
-    --slider-track-gradient-start: rgba(96, 165, 250, 0.45);
-    --slider-track-gradient-end: rgba(37, 99, 235, 0.35);
-    --slider-track-gradient-hover-start: rgba(125, 211, 252, 0.55);
-    --slider-track-gradient-hover-end: rgba(59, 130, 246, 0.4);
-    --slider-track-border: rgba(147, 197, 253, 0.35);
-    --slider-track-disabled-start: rgba(75, 85, 99, 0.6);
-    --slider-track-disabled-end: rgba(55, 65, 81, 0.6);
-    --slider-thumb-bg: #111827;
-    --slider-thumb-border: rgba(147, 197, 253, 0.6);
-    --slider-thumb-shadow: 0 8px 22px rgba(59, 130, 246, 0.45);
-    --slider-thumb-hover-shadow: 0 10px 26px rgba(96, 165, 250, 0.55);
-    --slider-thumb-disabled-bg: #1f2937;
-    --slider-thumb-disabled-border: rgba(75, 85, 99, 0.8);
-    --slider-focus-ring: rgba(96, 165, 250, 0.35);
   }
 }
 
@@ -72,6 +42,23 @@
     background: radial-gradient(circle at center, rgba(14, 165, 233, 0.55), rgba(16, 185, 129, 0));
   }
 
+  html.light .app-shell {
+    color: #0f172a;
+    background: radial-gradient(120% 120% at 100% 0%, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 28%, transparent 70%),
+      radial-gradient(120% 120% at 0% 100%, rgba(16, 185, 129, 0.12) 0%, rgba(14, 165, 233, 0.08) 32%, transparent 70%),
+      linear-gradient(135deg, #f8fafc, #e0f2fe);
+  }
+
+  html.light .app-shell__glow--primary {
+    background: radial-gradient(circle at center, rgba(59, 130, 246, 0.35), rgba(191, 219, 254, 0));
+    opacity: 0.7;
+  }
+
+  html.light .app-shell__glow--secondary {
+    background: radial-gradient(circle at center, rgba(16, 185, 129, 0.28), rgba(167, 243, 208, 0));
+    opacity: 0.75;
+  }
+
   .app-panel {
     @apply relative w-full px-10 py-12 text-gray-100;
     display: grid;
@@ -101,10 +88,25 @@
     mix-blend-mode: screen;
   }
 
+  html.light .app-panel {
+    color: #0f172a;
+  }
+
+  html.light .app-panel::before {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    box-shadow: 0 30px 65px rgba(148, 163, 184, 0.28);
+    backdrop-filter: blur(18px);
+  }
+
+  html.light .app-panel::after {
+    background: radial-gradient(120% 120% at 100% 0%, rgba(59, 130, 246, 0.12), transparent 65%);
+    mix-blend-mode: normal;
+  }
+
   .panel-header,
   .panel-section,
-  .panel-footer,
-  .notification-stack {
+  .panel-footer {
     position: relative;
     z-index: 1;
   }
@@ -118,10 +120,21 @@
     letter-spacing: 0.28em;
   }
 
+  html.light .panel-header__meta {
+    color: rgba(14, 116, 144, 0.75);
+  }
+
   .panel-chip {
     @apply inline-flex items-center gap-2 rounded-full bg-sky-500/15 px-3 py-1 text-[11px] font-semibold text-sky-200;
     border: 1px solid rgba(56, 189, 248, 0.35);
     box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.35);
+  }
+
+  html.light .panel-chip {
+    background: rgba(191, 219, 254, 0.5);
+    color: #0369a1;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.6);
   }
 
   .panel-header__pulse {
@@ -134,8 +147,16 @@
     @apply text-3xl font-semibold tracking-tight text-slate-100;
   }
 
+  html.light .panel-title {
+    color: #0f172a;
+  }
+
   .panel-subtitle {
     @apply mt-2 max-w-xl text-sm leading-relaxed text-slate-300/80;
+  }
+
+  html.light .panel-subtitle {
+    color: #475569;
   }
 
   .panel-section {
@@ -150,8 +171,16 @@
     @apply text-sm font-semibold uppercase tracking-[0.3em] text-slate-200/90;
   }
 
+  html.light .panel-section__title {
+    color: rgba(30, 64, 175, 0.9);
+  }
+
   .panel-section__hint {
     @apply text-xs text-sky-200/70;
+  }
+
+  html.light .panel-section__hint {
+    color: rgba(37, 99, 235, 0.65);
   }
 
   .status-grid {
@@ -186,9 +215,35 @@
     background: linear-gradient(135deg, rgba(248, 113, 113, 0.2), rgba(15, 23, 42, 0.92));
   }
 
+  html.light .status-card {
+    border-color: rgba(148, 163, 184, 0.25);
+    background: linear-gradient(135deg, rgba(191, 219, 254, 0.45), rgba(255, 255, 255, 0.95));
+    box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.6);
+    color: #0f172a;
+  }
+
+  html.light .status-card::after {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), transparent 55%);
+  }
+
+  html.light .status-card--ok {
+    border-color: rgba(34, 197, 94, 0.35);
+    background: linear-gradient(135deg, rgba(134, 239, 172, 0.5), rgba(255, 255, 255, 0.95));
+  }
+
+  html.light .status-card--error {
+    border-color: rgba(248, 113, 113, 0.4);
+    background: linear-gradient(135deg, rgba(252, 165, 165, 0.45), rgba(255, 255, 255, 0.95));
+  }
+
   .status-card__icon {
     @apply relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900/80;
     box-shadow: inset 0 0 12px rgba(56, 189, 248, 0.4);
+  }
+
+  html.light .status-card__icon {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.25));
+    box-shadow: inset 0 0 12px rgba(59, 130, 246, 0.3);
   }
 
   .status-card__beam {
@@ -200,8 +255,21 @@
     box-shadow: 0 0 12px rgba(94, 234, 212, 0.8);
   }
 
+  html.light .status-card__beam {
+    background-image: linear-gradient(to bottom, transparent, rgba(56, 189, 248, 0.65), transparent);
+  }
+
+  html.light .status-card__dot {
+    background: #0ea5e9;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.75);
+  }
+
   .status-card__label {
     @apply text-sm font-semibold text-slate-100;
+  }
+
+  html.light .status-card__label {
+    color: #0f172a;
   }
 
   .status-card__message {
@@ -209,8 +277,16 @@
     white-space: pre-line;
   }
 
+  html.light .status-card__message {
+    color: #475569;
+  }
+
   .status-card__detail {
     @apply mt-1 text-[11px] text-slate-400;
+  }
+
+  html.light .status-card__detail {
+    color: #64748b;
   }
 
   .mirror-select {
@@ -221,6 +297,10 @@
     @apply text-xs font-medium uppercase tracking-[0.22em] text-slate-200/80;
   }
 
+  html.light .mirror-select__label {
+    color: rgba(30, 64, 175, 0.8);
+  }
+
   .mirror-select__control {
     @apply relative;
   }
@@ -229,6 +309,13 @@
     @apply w-full appearance-none rounded-2xl bg-slate-900/70 px-5 py-3 text-sm text-slate-100 shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-400/70;
     border: 1px solid rgba(148, 163, 184, 0.25);
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  html.light .mirror-select__input {
+    background: rgba(255, 255, 255, 0.9);
+    color: #0f172a;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    box-shadow: inset 0 1px 2px rgba(148, 163, 184, 0.15);
   }
 
   .mirror-select__input:focus {
@@ -248,21 +335,43 @@
     @apply text-xs text-slate-400;
   }
 
+  html.light .mirror-select__note {
+    color: #64748b;
+  }
+
   .panel-footer {
     @apply flex flex-col gap-4 rounded-2xl border border-white/5 bg-white/5 px-6 py-5 sm:flex-row sm:items-end sm:justify-between;
     box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.06);
+  }
+
+  html.light .panel-footer {
+    border-color: rgba(148, 163, 184, 0.35);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.6);
   }
 
   .panel-meta {
     @apply grid flex-1 gap-3 text-xs text-slate-300 sm:grid-cols-3;
   }
 
+  html.light .panel-meta {
+    color: #475569;
+  }
+
   .panel-meta dt {
     @apply font-semibold text-slate-100/90;
   }
 
+  html.light .panel-meta dt {
+    color: #0f172a;
+  }
+
   .panel-meta dd {
     @apply mt-1 break-all text-[11px] text-slate-400;
+  }
+
+  html.light .panel-meta dd {
+    color: #64748b;
   }
 
   .btn-apple {
@@ -292,46 +401,6 @@
     @apply h-4 w-4 animate-spin;
   }
 
-  .notification-stack {
-    @apply space-y-3;
-  }
-
-  .notification {
-    @apply relative overflow-hidden rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-sm shadow-lg backdrop-blur-md transition-all duration-300 ease-apple;
-  }
-
-  .notification::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(120deg, rgba(56, 189, 248, 0.35), transparent 60%);
-    opacity: 0.35;
-    mix-blend-mode: screen;
-  }
-
-  .notification__title {
-    @apply text-sm font-semibold;
-  }
-
-  .notification__message {
-    @apply mt-1 text-xs text-slate-200;
-  }
-
-  .notification.success {
-    border-color: rgba(16, 185, 129, 0.35);
-  }
-
-  .notification.warning {
-    border-color: rgba(250, 204, 21, 0.35);
-  }
-
-  .notification.error {
-    border-color: rgba(248, 113, 113, 0.4);
-  }
-
-  .notification.info {
-    border-color: rgba(59, 130, 246, 0.4);
-  }
 }
 
 @keyframes pulse {
@@ -359,13 +428,32 @@
   background: linear-gradient(90deg, rgba(56, 189, 248, 0), rgba(56, 189, 248, 0.45), rgba(59, 130, 246, 0));
 }
 
+html.light .title-bar {
+  border-color: rgba(148, 163, 184, 0.35);
+  background-image: linear-gradient(90deg, rgba(59, 130, 246, 0.15), rgba(16, 185, 129, 0.08));
+}
+
+html.light .title-bar::after {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0), rgba(37, 99, 235, 0.35), rgba(56, 189, 248, 0));
+}
+
 .title-bar__brand {
   @apply flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.32em] text-slate-200/80;
+}
+
+html.light .title-bar__brand {
+  color: rgba(15, 23, 42, 0.7);
 }
 
 .title-bar__logo {
   @apply relative flex h-7 w-7 items-center justify-center overflow-hidden rounded-xl border border-sky-400/40 bg-slate-900/70;
   box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.4), 0 10px 25px rgba(8, 47, 73, 0.45);
+}
+
+html.light .title-bar__logo {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: linear-gradient(135deg, rgba(191, 219, 254, 0.85), rgba(191, 219, 254, 0.35));
+  box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.35), 0 10px 25px rgba(148, 163, 184, 0.35);
 }
 
 .title-bar__logo::before,
@@ -385,9 +473,22 @@
   mix-blend-mode: screen;
 }
 
+html.light .title-bar__logo::before {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(125, 211, 252, 0.2));
+}
+
+html.light .title-bar__logo::after {
+  background: radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.4), transparent 55%);
+}
+
 .title-bar__logo-core {
   @apply relative block h-2 w-2 rounded-full bg-sky-200;
   box-shadow: 0 0 12px rgba(186, 230, 253, 0.9);
+}
+
+html.light .title-bar__logo-core {
+  background: #2563eb;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.65);
 }
 
 .title-bar__text {
@@ -398,8 +499,16 @@
   @apply text-xs font-semibold tracking-[0.18em] text-slate-100;
 }
 
+html.light .title-bar__text strong {
+  color: #0f172a;
+}
+
 .title-bar__text span {
   @apply text-[10px] uppercase tracking-[0.35em] text-slate-400;
+}
+
+html.light .title-bar__text span {
+  color: rgba(30, 64, 175, 0.6);
 }
 
 .title-bar__controls {
