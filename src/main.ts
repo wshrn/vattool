@@ -6,7 +6,10 @@ import { useThemeStore } from './stores/theme'
 import { ensureOfflineLicense } from './services/sqlmap'
 
 const bootstrap = async () => {
-  await ensureOfflineLicense()
+  const hasValidOfflineLicense = await ensureOfflineLicense()
+  if (!hasValidOfflineLicense) {
+    return
+  }
 
   const app = createApp(App)
   const pinia = createPinia()
