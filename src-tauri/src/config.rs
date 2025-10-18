@@ -2,11 +2,12 @@ use crate::FileWriteLock;
 use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Map, Value};
 use std::{collections::HashMap, fs, path::PathBuf};
+use tauri::{Emitter, Manager};
 
 pub const TOOLBOX_THEME_ENV_NAME: &str = "ZHIGONG_TOOLBOX_THEME";
 const CONFIG_FILE_NAME: &str = "settings.json";
 
-pub fn ensure_config_dir(app: &tauri::AppHandle) -> Result<()> {
+pub fn ensure_config_dir(app: &impl tauri::Manager) -> Result<()> {
     let path = app
         .path_resolver()
         .app_config_dir()

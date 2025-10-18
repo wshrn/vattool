@@ -361,7 +361,7 @@ fn configure_pip_mirror(option: &MirrorOption) -> Result<()> {
 }
 
 fn resolve_mirror_option(value: String) -> MirrorOption {
-    let mut candidates = mirror_candidates();
+    let candidates = mirror_candidates();
     if let Some(option) = candidates
         .iter()
         .find(|candidate| candidate.value.eq_ignore_ascii_case(&value))
@@ -400,16 +400,14 @@ fn status_err(message: impl Into<String>, detail: Option<String>) -> StatusLine 
 
 #[cfg(target_os = "windows")]
 mod platform {
-    use super::*;
     use anyhow::Result;
     use std::io;
     use windows::core::w;
-    use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+    use windows::Win32::Foundation::{LPARAM, WPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{
-        SendMessageTimeoutW, HWND_BROADCAST, SEND_MESSAGE_TIMEOUT_FLAGS, SMTO_ABORTIFHUNG,
-        WM_SETTINGCHANGE,
+        SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
     };
-    use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
     use winreg::RegKey;
 
     pub fn get_env(name: &str) -> Result<Option<String>> {
@@ -439,16 +437,15 @@ mod platform {
 
     pub fn broadcast_environment_change() {
         unsafe {
-            let mut result = LRESULT::default();
             let param = w!("Environment");
             let _ = SendMessageTimeoutW(
                 HWND_BROADCAST,
                 WM_SETTINGCHANGE,
                 WPARAM::default(),
                 LPARAM(param.as_ptr() as isize),
-                SEND_MESSAGE_TIMEOUT_FLAGS(SMTO_ABORTIFHUNG),
+                SMTO_ABORTIFHUNG,
                 5000,
-                Some(&mut result),
+                None,
             );
         }
     }
