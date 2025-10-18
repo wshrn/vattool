@@ -1,35 +1,34 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-500 ease-apple">
+  <div class="app-shell text-slate-900 dark:text-slate-100">
     <TitleBar />
-    <main class="max-w-4xl mx-auto px-6 py-10">
-      <section class="card-apple p-8 space-y-6 animate-slide-up">
-        <header class="space-y-2">
-          <h1 class="text-2xl font-semibold tracking-tight">Python 环境初始化助手</h1>
-          <p class="text-sm text-gray-600 dark:text-gray-400">在当前目录快速检测并初始化 Python 运行环境，同时支持国内常见镜像源配置。</p>
+    <main class="app-main">
+      <section ref="cardRef" class="card-apple space-y-8">
+        <div class="card-accent" aria-hidden="true"></div>
+        <header class="card-header">
+          <p class="card-eyebrow">Python Environment Toolkit</p>
+          <h1 class="card-title">Python 环境初始化助手</h1>
+          <p class="card-subtitle">在当前目录快速检测并初始化 Python 运行环境，同时支持国内常见镜像源配置。</p>
         </header>
 
-        <div class="grid gap-3">
+        <div class="status-grid">
           <div
             v-for="item in statusLines"
             :key="item.label"
             class="result-item"
             :class="item.status.ok ? 'success' : 'error'"
           >
-            <p class="text-sm font-medium">{{ item.label }}</p>
-            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 whitespace-pre-line">
-              {{ item.status.message }}
-            </p>
-            <p v-if="item.status.detail" class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ item.status.detail }}</p>
+            <div class="result-item__header">
+              <span class="status-dot" :class="item.status.ok ? 'status-dot--success' : 'status-dot--error'"></span>
+              <p class="result-item__title">{{ item.label }}</p>
+            </div>
+            <p class="result-item__message">{{ item.status.message }}</p>
+            <p v-if="item.status.detail" class="result-item__detail">{{ item.status.detail }}</p>
           </div>
         </div>
 
-        <div class="space-y-3">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">选择默认 pip 国内镜像源</label>
-          <select
-            v-model="selectedMirror"
-            class="input-apple"
-            :disabled="initializing"
-          >
+        <div class="input-group">
+          <label class="input-label">选择默认 pip 国内镜像源</label>
+          <select v-model="selectedMirror" class="input-apple" :disabled="initializing">
             <option
               v-for="mirror in mirrorOptions"
               :key="mirror.value"
@@ -38,22 +37,18 @@
               {{ mirror.label }} - {{ mirror.value }}
             </option>
           </select>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
+          <p class="input-helper">
             将写入全局 <code>pip.ini</code> 配置，并自动加入对应的 trusted-host。
           </p>
         </div>
 
-        <div class="flex items-center justify-between">
-          <div class="text-xs text-gray-500 dark:text-gray-400">
+        <div class="card-footer">
+          <div class="card-meta">
             <p>当前 Python 路径：{{ status?.pythonPath ?? '未检测到' }}</p>
             <p>Scripts 目录：{{ status?.scriptsPath ?? '未检测到' }}</p>
             <p>当前镜像：{{ status?.pipMirrorConfigured.currentMirror ?? '未检测到' }}</p>
           </div>
-          <button
-            class="btn-primary px-6 py-3 text-sm"
-            :disabled="initializing || loading"
-            @click="handleInitialize"
-          >
+          <button class="btn-primary" :disabled="initializing || loading" @click="handleInitialize">
             <span v-if="initializing" class="flex items-center space-x-2">
               <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -82,7 +77,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
 import TitleBar from './components/TitleBar.vue'
 import { fetchPythonEnvStatus, initializePythonEnvironment, type PythonEnvStatus } from './services/pythonEnv'
 
@@ -99,6 +95,30 @@ const initializing = ref(false)
 const selectedMirror = ref('https://pypi.tuna.tsinghua.edu.cn/simple')
 const notifications = reactive<NotificationItem[]>([])
 let notificationSeed = 0
+const cardRef = ref<HTMLElement | null>(null)
+const isTauriEnvironment = typeof window !== 'undefined' && '__TAURI__' in window
+const appWindow = isTauriEnvironment ? getCurrentWindow() : null
+
+const adjustWindowSize = async () => {
+  await nextTick()
+  if (!appWindow || !isTauriEnvironment) {
+    return
+  }
+  const card = cardRef.value
+  if (!card) {
+    return
+  }
+  const rect = card.getBoundingClientRect()
+  const horizontalPadding = 64
+  const verticalPadding = 96
+  const width = Math.max(Math.ceil(rect.width + horizontalPadding), 560)
+  const height = Math.max(Math.ceil(rect.height + verticalPadding), 520)
+  try {
+    await appWindow.setSize(new LogicalSize(width, height))
+  } catch (error) {
+    console.error('Failed to resize window:', error)
+  }
+}
 
 const mirrorOptions = computed(() => status.value?.mirrorCandidates ?? [
   {
@@ -128,8 +148,10 @@ const pushNotification = (item: Omit<NotificationItem, 'id'>) => {
     const index = notifications.findIndex((tip) => tip.id === id)
     if (index >= 0) {
       notifications.splice(index, 1)
+      adjustWindowSize()
     }
   }, 5000)
+  adjustWindowSize()
 }
 
 const synchronizeMirrorSelection = () => {
@@ -146,6 +168,7 @@ const loadStatus = async () => {
   try {
     status.value = await fetchPythonEnvStatus()
     synchronizeMirrorSelection()
+    await adjustWindowSize()
   } catch (error) {
     console.error(error)
     pushNotification({
@@ -180,10 +203,20 @@ const handleInitialize = async () => {
     })
   } finally {
     initializing.value = false
+    await adjustWindowSize()
   }
 }
 
 onMounted(async () => {
   await loadStatus()
+  await adjustWindowSize()
 })
+
+watch(
+  () => [status.value, notifications.length, initializing.value, selectedMirror.value],
+  () => {
+    adjustWindowSize()
+  },
+  { flush: 'post' }
+)
 </script>
