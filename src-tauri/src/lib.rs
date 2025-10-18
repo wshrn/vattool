@@ -19,7 +19,8 @@ pub fn run() {
             config::save_config
         ])
         .setup(|app| {
-            config::ensure_config_dir(app)?;
+            let handle = app.handle();
+            config::ensure_config_dir(&handle)?;
             Ok(())
         })
         .run(tauri::generate_context!())
