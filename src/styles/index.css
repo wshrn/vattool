@@ -370,7 +370,15 @@
   }
 
   .mirror-select__control {
-    @apply relative flex items-center;
+    @apply relative flex w-full items-center;
+  }
+
+  .mirror-select__control--open .mirror-select__chevron {
+    transform: rotate(180deg);
+  }
+
+  .mirror-select__control--disabled {
+    pointer-events: none;
   }
 
   .mirror-select__icon {
@@ -392,6 +400,7 @@
 
   .mirror-select__chevron {
     @apply pointer-events-none absolute inset-y-0 right-5 flex items-center text-sky-700/70;
+    transition: transform 0.25s ease;
   }
 
   .mirror-select__chevron svg {
@@ -401,6 +410,29 @@
 
   .dark .mirror-select__chevron {
     @apply text-sky-200/80;
+  }
+
+  .mirror-select__value {
+    @apply flex flex-col text-left;
+    gap: 0.2rem;
+  }
+
+  .mirror-select__value-label {
+    @apply text-sm font-semibold text-slate-800;
+    letter-spacing: 0.02em;
+  }
+
+  .mirror-select__value-url {
+    @apply text-xs font-medium text-slate-500;
+    letter-spacing: 0.01em;
+  }
+
+  .dark .mirror-select__value-label {
+    @apply text-slate-100;
+  }
+
+  .dark .mirror-select__value-url {
+    @apply text-slate-300/80;
   }
 
   .mirror-select__shine {
@@ -423,6 +455,89 @@
 
   .dark .mirror-select__border {
     @apply border-sky-300/10;
+  }
+
+  .mirror-select__menu {
+    @apply absolute left-0 right-0 z-10 mt-2 max-h-60 overflow-y-auto rounded-2xl px-1 py-2 text-sm shadow-lg;
+    background: linear-gradient(145deg, rgba(248, 250, 252, 0.96), rgba(219, 234, 254, 0.92));
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 22px 45px rgba(15, 23, 42, 0.18);
+  }
+
+  .dark .mirror-select__menu {
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.92));
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    box-shadow: 0 24px 48px rgba(2, 6, 23, 0.65);
+  }
+
+  .mirror-select__option {
+    @apply cursor-pointer rounded-xl px-4 py-3 transition;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.2rem;
+    color: rgba(15, 23, 42, 0.82);
+  }
+
+  .mirror-select__option + .mirror-select__option {
+    margin-top: 0.25rem;
+  }
+
+  .mirror-select__option-label {
+    @apply font-semibold;
+  }
+
+  .mirror-select__option-value {
+    @apply text-xs font-medium text-slate-500;
+    word-break: break-all;
+  }
+
+  .mirror-select__option--active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.16), rgba(56, 189, 248, 0.1));
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.28);
+  }
+
+  .mirror-select__option--selected {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(14, 165, 233, 0.18));
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.45);
+  }
+
+  .mirror-select__option--selected .mirror-select__option-label {
+    @apply text-sky-900;
+  }
+
+  .dark .mirror-select__option {
+    @apply text-slate-100;
+    color: rgba(226, 232, 240, 0.88);
+  }
+
+  .dark .mirror-select__option-value {
+    @apply text-slate-300/80;
+  }
+
+  .dark .mirror-select__option--active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(56, 189, 248, 0.12));
+    box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.35);
+  }
+
+  .dark .mirror-select__option--selected {
+    background: linear-gradient(135deg, rgba(30, 64, 175, 0.42), rgba(14, 165, 233, 0.2));
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.45);
+  }
+
+  .dark .mirror-select__option--selected .mirror-select__option-label {
+    @apply text-sky-200;
+  }
+
+  .mirror-dropdown-enter-active,
+  .mirror-dropdown-leave-active {
+    transition: opacity 0.18s ease, transform 0.2s ease;
+  }
+
+  .mirror-dropdown-enter-from,
+  .mirror-dropdown-leave-to {
+    opacity: 0;
+    transform: translateY(-8px);
   }
 
   .mirror-select__note {
