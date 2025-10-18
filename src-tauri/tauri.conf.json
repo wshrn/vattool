@@ -14,15 +14,15 @@
     "windows": [
       {
         "title": "知攻系统-Python 环境初始化助手",
-        "width": 960,
-        "height": 900,
-        "minWidth": 900,
-        "minHeight": 700,
+        "width": 880,
+        "height": 620,
+        "minWidth": 640,
+        "minHeight": 520,
         "center": true,
         "decorations": false,
         "transparent": false,
         "alwaysOnTop": false,
-        "resizable": true,
+        "resizable": false,
         "fullscreen": false
       }
     ],
