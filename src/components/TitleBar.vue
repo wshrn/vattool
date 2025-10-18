@@ -1,25 +1,29 @@
 <template>
   <div
-    class="flex items-center justify-between w-full h-9 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 select-none cursor-move"
+    class="titlebar-surface relative flex h-9 w-full items-center justify-between overflow-hidden px-3 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-200"
     data-tauri-drag-region
     @mousedown="startDragging"
   >
-    <div class="flex items-center space-x-2 text-xs font-medium text-gray-700 dark:text-gray-200 pointer-events-none">
+    <div class="pointer-events-none flex items-center gap-2 text-[10px]">
       <span
-        class="flex items-center justify-center w-5 h-5 text-[11px] font-semibold text-white bg-apple-blue rounded"
+        class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-blue-600 text-[11px] font-semibold text-white shadow-[0_0_12px_rgba(56,189,248,0.45)]"
         aria-hidden="true"
       >
         知
       </span>
-      <span>知攻系统</span>
+      <span class="tracking-[0.28em] text-slate-300">知攻系统</span>
     </div>
     <div
-      class="flex items-center space-x-2 pointer-events-auto"
+      class="pointer-events-auto flex items-center gap-2"
       data-tauri-drag-region="false"
       @mousedown.stop
     >
       <ThemeToggle />
       <WindowControls />
+    </div>
+    <div class="pointer-events-none absolute inset-0 -z-10">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.2),_transparent_70%)]"></div>
+      <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-sky-400/60 to-transparent"></div>
     </div>
   </div>
 </template>
