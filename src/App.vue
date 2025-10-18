@@ -5,9 +5,6 @@
     <TitleBar />
     <main class="app-panel">
       <header class="panel-header">
-        <div class="panel-header__meta">
-          <span class="panel-header__pulse" />
-        </div>
         <div>
           <h1 class="panel-title">Python 环境初始化助手</h1>
           <p class="panel-subtitle">一键侦测并智能修复 Python 运行环境，快速接入国内高可用镜像源。</p>
