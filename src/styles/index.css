@@ -391,7 +391,7 @@
   }
 
   .mirror-select__icon {
-    @apply pointer-events-none absolute inset-y-0 left-4 flex h-9 w-9 items-center justify-center rounded-xl text-sky-600/90;
+    @apply pointer-events-none absolute left-4 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-sky-600/90;
     background: linear-gradient(145deg, rgba(125, 211, 252, 0.2), rgba(59, 130, 246, 0.08));
     box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.18), 0 10px 18px rgba(148, 163, 184, 0.18);
   }
