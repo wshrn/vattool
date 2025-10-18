@@ -337,11 +337,13 @@
 
   .mirror-select__input {
     @apply w-full appearance-none rounded-2xl py-3.5 pl-14 pr-14 text-sm font-medium shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-300/40 focus:ring-offset-2 focus:ring-offset-white;
+    @apply flex items-center justify-between text-left gap-3;
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(14, 165, 233, 0.05));
     color: #0f172a;
     border: 1px solid rgba(148, 163, 184, 0.35);
     backdrop-filter: blur(12px);
     transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+    cursor: pointer;
   }
 
   .mirror-select__input:hover {
@@ -354,8 +356,14 @@
     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
   }
 
-  .mirror-select__input:disabled {
-    @apply opacity-60;
+  .mirror-select__input--disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
+  .mirror-select__input[data-open='true'] {
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 0 18px 32px rgba(59, 130, 246, 0.12), 0 0 0 4px rgba(59, 130, 246, 0.12);
+    transform: translateY(-1px);
   }
 
   .dark .mirror-select__input {
@@ -367,6 +375,11 @@
   .dark .mirror-select__input:focus {
     border-color: rgba(56, 189, 248, 0.55);
     box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15);
+  }
+
+  .dark .mirror-select__input[data-open='true'] {
+    border-color: rgba(125, 211, 252, 0.5);
+    box-shadow: 0 20px 36px rgba(15, 23, 42, 0.45), 0 0 0 4px rgba(125, 211, 252, 0.12);
   }
 
   .mirror-select__control {
@@ -403,6 +416,39 @@
     @apply text-sky-200/80;
   }
 
+  .mirror-select__value {
+    @apply flex min-w-0 flex-col;
+  }
+
+  .mirror-select__value-label {
+    @apply truncate text-sm font-semibold;
+    color: rgba(15, 23, 42, 0.9);
+    letter-spacing: 0.01em;
+  }
+
+  .mirror-select__value-url {
+    @apply truncate text-xs font-medium;
+    color: rgba(37, 99, 235, 0.8);
+    letter-spacing: 0.02em;
+  }
+
+  .dark .mirror-select__value-label {
+    @apply text-slate-100;
+  }
+
+  .dark .mirror-select__value-url {
+    @apply text-sky-200;
+    color: rgba(125, 211, 252, 0.75);
+  }
+
+  .mirror-select__value--empty {
+    @apply justify-center;
+  }
+
+  .mirror-select__placeholder {
+    @apply text-sm font-medium text-slate-400;
+  }
+
   .mirror-select__shine {
     @apply pointer-events-none absolute inset-0 rounded-2xl;
     background: radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.5), transparent 55%);
@@ -423,6 +469,100 @@
 
   .dark .mirror-select__border {
     @apply border-sky-300/10;
+  }
+
+  .mirror-select__dropdown {
+    @apply absolute left-0 right-0 z-20 mt-3 max-h-64 overflow-y-auto rounded-2xl border px-2 py-2 shadow-xl;
+    background: linear-gradient(145deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.92));
+    border-color: rgba(148, 163, 184, 0.25);
+    box-shadow: 0 24px 45px rgba(15, 23, 42, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(18px);
+  }
+
+  .mirror-select__dropdown::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .mirror-select__dropdown::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.45);
+    border-radius: 9999px;
+  }
+
+  .mirror-select__dropdown::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .dark .mirror-select__dropdown {
+    background: linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.9));
+    border-color: rgba(148, 163, 184, 0.2);
+    box-shadow: 0 26px 50px rgba(2, 6, 23, 0.6), inset 0 0 0 1px rgba(148, 163, 184, 0.08);
+  }
+
+  .mirror-select__option {
+    @apply flex flex-col gap-1 rounded-xl px-4 py-3 transition-all duration-200 ease-out;
+    color: #0f172a;
+    border: 1px solid transparent;
+  }
+
+  .mirror-select__option-label {
+    @apply text-sm font-semibold;
+    letter-spacing: 0.02em;
+  }
+
+  .mirror-select__option-url {
+    @apply text-xs font-medium text-slate-500;
+    letter-spacing: 0.02em;
+  }
+
+  .mirror-select__option--active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.14), rgba(56, 189, 248, 0.12));
+    border-color: rgba(59, 130, 246, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.3);
+    transform: translateX(3px);
+  }
+
+  .mirror-select__option--selected {
+    border-color: rgba(37, 99, 235, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.35);
+  }
+
+  .dark .mirror-select__option {
+    @apply text-slate-100;
+    border-color: transparent;
+  }
+
+  .dark .mirror-select__option-url {
+    @apply text-sky-200/80;
+  }
+
+  .dark .mirror-select__option--active {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(30, 64, 175, 0.22));
+    border-color: rgba(125, 211, 252, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(148, 197, 253, 0.35);
+  }
+
+  .dark .mirror-select__option--selected {
+    border-color: rgba(148, 197, 253, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(148, 197, 253, 0.35);
+  }
+
+  .mirror-select__empty {
+    @apply rounded-xl px-4 py-5 text-center text-sm font-medium text-slate-500;
+  }
+
+  .dark .mirror-select__empty {
+    @apply text-slate-300;
+  }
+
+  .mirror-select__dropdown-transition-enter-active,
+  .mirror-select__dropdown-transition-leave-active {
+    transition: opacity 150ms ease, transform 150ms ease;
+  }
+
+  .mirror-select__dropdown-transition-enter-from,
+  .mirror-select__dropdown-transition-leave-to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
   }
 
   .mirror-select__note {
