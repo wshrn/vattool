@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-500 ease-apple">
     <TitleBar />
-    <main class="max-w-4xl mx-auto px-6 py-10">
+    <main class="max-w-3xl mx-auto px-6 py-10">
       <section class="card-apple p-8 space-y-6 animate-slide-up">
         <header class="space-y-2">
           <h1 class="text-2xl font-semibold tracking-tight">Python 环境初始化助手</h1>
