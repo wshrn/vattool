@@ -18,6 +18,22 @@
     --dialog-border: rgba(59, 130, 246, 0.25);
     color-scheme: dark;
   }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    @apply antialiased;
+    margin: 0;
+    overflow: hidden;
+    background: transparent;
+  }
+
+  #app {
+    height: 100%;
+  }
 }
 
 @layer components {
@@ -319,16 +335,18 @@
     @apply text-slate-200/80;
   }
 
-  .mirror-select__control {
-    @apply relative;
-  }
-
   .mirror-select__input {
-    @apply w-full appearance-none rounded-2xl px-5 py-3 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-300/40 focus:ring-offset-2 focus:ring-offset-white;
-    background: rgba(255, 255, 255, 0.9);
+    @apply w-full appearance-none rounded-2xl py-3.5 pl-14 pr-14 text-sm font-medium shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-300/40 focus:ring-offset-2 focus:ring-offset-white;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(14, 165, 233, 0.05));
     color: #0f172a;
     border: 1px solid rgba(148, 163, 184, 0.35);
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    backdrop-filter: blur(12px);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+  }
+
+  .mirror-select__input:hover {
+    box-shadow: 0 14px 28px rgba(148, 163, 184, 0.18);
+    transform: translateY(-1px);
   }
 
   .mirror-select__input:focus {
@@ -341,13 +359,61 @@
   }
 
   .dark .mirror-select__input {
-    @apply bg-slate-900/70 text-slate-100;
+    @apply text-slate-100;
+    background: linear-gradient(135deg, rgba(30, 64, 175, 0.45), rgba(15, 23, 42, 0.75));
     border: 1px solid rgba(148, 163, 184, 0.25);
   }
 
   .dark .mirror-select__input:focus {
     border-color: rgba(56, 189, 248, 0.55);
     box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15);
+  }
+
+  .mirror-select__control {
+    @apply relative flex items-center;
+  }
+
+  .mirror-select__icon {
+    @apply pointer-events-none absolute inset-y-0 left-4 flex h-9 w-9 items-center justify-center rounded-xl text-sky-600/90;
+    background: linear-gradient(145deg, rgba(125, 211, 252, 0.2), rgba(59, 130, 246, 0.08));
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.18), 0 10px 18px rgba(148, 163, 184, 0.18);
+  }
+
+  .mirror-select__icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .dark .mirror-select__icon {
+    @apply text-sky-200/90;
+    background: linear-gradient(145deg, rgba(37, 99, 235, 0.25), rgba(14, 165, 233, 0.12));
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.3), 0 12px 24px rgba(2, 6, 23, 0.45);
+  }
+
+  .mirror-select__chevron {
+    @apply pointer-events-none absolute inset-y-0 right-5 flex items-center text-sky-700/70;
+  }
+
+  .mirror-select__chevron svg {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  .dark .mirror-select__chevron {
+    @apply text-sky-200/80;
+  }
+
+  .mirror-select__shine {
+    @apply pointer-events-none absolute inset-0 rounded-2xl;
+    background: radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.5), transparent 55%);
+    opacity: 0.45;
+    mix-blend-mode: screen;
+  }
+
+  .dark .mirror-select__shine {
+    background: radial-gradient(circle at 18% 24%, rgba(148, 197, 253, 0.45), transparent 55%);
+    opacity: 0.3;
+    mix-blend-mode: lighten;
   }
 
   .mirror-select__border {
