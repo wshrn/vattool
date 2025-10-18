@@ -11,7 +11,7 @@ pub fn ensure_config_dir(app: &tauri::AppHandle) -> Result<()> {
     let path = app
         .path()
         .app_config_dir()
-        .ok_or_else(|| anyhow!("无法定位配置目录"))?;
+        .context("无法定位配置目录")?;
     fs::create_dir_all(&path).with_context(|| format!("无法创建配置目录: {}", path.display()))?;
     Ok(())
 }
@@ -21,7 +21,7 @@ fn config_path(app: &tauri::AppHandle) -> Result<PathBuf> {
     let dir = app
         .path()
         .app_config_dir()
-        .ok_or_else(|| anyhow!("无法定位配置目录"))?;
+        .context("无法定位配置目录")?;
     Ok(dir.join(CONFIG_FILE_NAME))
 }
 
