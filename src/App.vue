@@ -95,17 +95,32 @@
         </button>
       </footer>
 
-      <transition-group name="list" tag="div" class="notification-stack">
+      <Transition name="dialog">
         <div
-          v-for="tip in notifications"
-          :key="tip.id"
-          class="notification"
-          :class="tip.type"
+          v-if="dialog.visible"
+          class="dialog-backdrop"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="dialog-title"
         >
-          <p class="notification__title">{{ tip.title }}</p>
-          <p class="notification__message">{{ tip.message }}</p>
+          <article class="dialog-panel" :class="dialog.type">
+            <header class="dialog-panel__header">
+              <h3 id="dialog-title" class="dialog-panel__title">{{ dialog.title }}</h3>
+              <button class="dialog-panel__close" type="button" @click="closeDialog" aria-label="关闭提示">
+                <svg class="dialog-panel__close-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+              </button>
+            </header>
+            <p class="dialog-panel__message">{{ dialog.message }}</p>
+            <footer class="dialog-panel__footer">
+              <button class="btn-primary dialog-panel__action" type="button" @click="closeDialog">
+                我知道了
+              </button>
+            </footer>
+          </article>
         </div>
-      </transition-group>
+      </Transition>
     </main>
   </div>
 </template>
@@ -115,19 +130,16 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import TitleBar from './components/TitleBar.vue'
 import { fetchPythonEnvStatus, initializePythonEnvironment, type PythonEnvStatus } from './services/pythonEnv'
 
-interface NotificationItem {
-  id: number
-  title: string
-  message: string
-  type: 'success' | 'error' | 'info' | 'warning'
-}
-
 const status = ref<PythonEnvStatus | null>(null)
 const loading = ref(true)
 const initializing = ref(false)
 const selectedMirror = ref('https://pypi.tuna.tsinghua.edu.cn/simple')
-const notifications = reactive<NotificationItem[]>([])
-let notificationSeed = 0
+const dialog = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  type: 'info' as 'success' | 'error' | 'info' | 'warning',
+})
 
 const mirrorOptions = computed(() => status.value?.mirrorCandidates ?? [
   {
@@ -150,15 +162,15 @@ const statusLines = computed(() => {
   ]
 })
 
-const pushNotification = (item: Omit<NotificationItem, 'id'>) => {
-  const id = ++notificationSeed
-  notifications.push({ id, ...item })
-  setTimeout(() => {
-    const index = notifications.findIndex((tip) => tip.id === id)
-    if (index >= 0) {
-      notifications.splice(index, 1)
-    }
-  }, 5000)
+const openDialog = (item: { title: string; message: string; type?: 'success' | 'error' | 'info' | 'warning' }) => {
+  dialog.title = item.title
+  dialog.message = item.message
+  dialog.type = item.type ?? 'info'
+  dialog.visible = true
+}
+
+const closeDialog = () => {
+  dialog.visible = false
 }
 
 const synchronizeMirrorSelection = () => {
@@ -177,7 +189,7 @@ const loadStatus = async () => {
     synchronizeMirrorSelection()
   } catch (error) {
     console.error(error)
-    pushNotification({
+    openDialog({
       title: '状态读取失败',
       message: error instanceof Error ? error.message : String(error),
       type: 'error',
@@ -195,14 +207,14 @@ const handleInitialize = async () => {
   try {
     status.value = await initializePythonEnvironment({ mirror: selectedMirror.value })
     synchronizeMirrorSelection()
-    pushNotification({
+    openDialog({
       title: '初始化完成',
       message: 'Python 环境变量与国内镜像已配置。',
       type: 'success',
     })
   } catch (error) {
     console.error(error)
-    pushNotification({
+    openDialog({
       title: '初始化失败',
       message: error instanceof Error ? error.message : String(error),
       type: 'error',
