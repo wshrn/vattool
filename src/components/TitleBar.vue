@@ -1,6 +1,7 @@
 <template>
   <div
     class="flex items-center justify-between w-full h-9 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 select-none cursor-move"
+    data-tauri-drag-region
     @mousedown="startDragging"
   >
     <div class="flex items-center space-x-2 text-xs font-medium text-gray-700 dark:text-gray-200 pointer-events-none">
@@ -12,7 +13,11 @@
       </span>
       <span>知攻系统</span>
     </div>
-    <div class="flex items-center space-x-2 pointer-events-auto" @mousedown.stop>
+    <div
+      class="flex items-center space-x-2 pointer-events-auto"
+      data-tauri-drag-region="false"
+      @mousedown.stop
+    >
       <ThemeToggle />
       <WindowControls />
     </div>
