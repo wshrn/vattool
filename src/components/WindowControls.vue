@@ -1,32 +1,37 @@
 <template>
-  <div class="flex items-center space-x-1">
+  <div class="flex items-center gap-1.5">
     <button
-      class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+      type="button"
+      class="control-button"
+      aria-label="最小化窗口"
       @click.stop.prevent="minimize"
       @mousedown.stop
     >
-      <MinusIcon class="w-4 h-4 text-gray-600 dark:text-gray-300" />
+      <MinusIcon />
     </button>
     <button
-      class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+      type="button"
+      class="control-button"
+      aria-label="切换窗口最大化"
       @click.stop.prevent="toggleMaximize"
       @mousedown.stop
     >
       <Squares2X2Icon
         v-if="!isMaximized"
-        class="w-4 h-4 text-gray-600 dark:text-gray-300"
       />
       <Squares2X2Icon
         v-else
-        class="w-4 h-4 text-gray-600 dark:text-gray-300 rotate-45"
+        class="rotate-45"
       />
     </button>
     <button
-      class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-500 hover:text-white"
+      type="button"
+      class="control-button control-button--danger"
+      aria-label="关闭窗口"
       @click.stop.prevent="closeWindow"
       @mousedown.stop
     >
-      <XMarkIcon class="w-4 h-4" />
+      <XMarkIcon />
     </button>
   </div>
 </template>
