@@ -243,6 +243,8 @@ const synchronizeWindowSize = () => {
 
   resizeAnimationFrame = requestAnimationFrame(async () => {
     const cardRect = element.getBoundingClientRect()
+    const shellElement = appShellRef.value
+    const shellRect = shellElement?.getBoundingClientRect()
     const titleBarElement = titleBarRef.value?.rootEl ?? null
     const titleBarRect = titleBarElement?.getBoundingClientRect()
 
@@ -264,10 +266,16 @@ const synchronizeWindowSize = () => {
 
     const contentWidth = cardRect.width + paddingX
     const contentHeight = cardRect.height + paddingY + titleBarHeight
-    const verticalBuffer = 16
+    const shellScrollWidth = shellElement?.scrollWidth ?? shellRect?.width ?? contentWidth
+    const shellScrollHeight = shellElement?.scrollHeight ?? shellRect?.height ?? contentHeight
+    const verticalBuffer = 32
 
-    const width = Math.ceil(Math.max(contentWidth, titleBarWidth))
-    const height = Math.ceil(contentHeight + verticalBuffer)
+    const width = Math.ceil(
+      Math.max(contentWidth, titleBarWidth, shellScrollWidth)
+    )
+    const height = Math.ceil(
+      Math.max(contentHeight + verticalBuffer, shellScrollHeight + verticalBuffer)
+    )
 
     try {
       const size = new LogicalSize(width, height)
