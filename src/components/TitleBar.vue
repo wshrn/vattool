@@ -1,7 +1,7 @@
 <template>
   <div
     class="flex items-center justify-between w-full h-9 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 select-none cursor-move"
-    @mousedown="startDragging"
+    data-tauri-drag-region
   >
     <div class="flex items-center space-x-2 text-xs font-medium text-gray-700 dark:text-gray-200 pointer-events-none">
       <span
@@ -12,7 +12,10 @@
       </span>
       <span>知攻系统</span>
     </div>
-    <div class="flex items-center space-x-2 pointer-events-auto" @mousedown.stop>
+    <div
+      class="flex items-center space-x-2 pointer-events-auto"
+      data-tauri-drag-region="false"
+    >
       <ThemeToggle />
       <WindowControls />
     </div>
@@ -20,19 +23,6 @@
 </template>
 
 <script setup lang="ts">
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import ThemeToggle from './ThemeToggle.vue'
 import WindowControls from './WindowControls.vue'
-
-const appWindow = getCurrentWindow()
-
-const startDragging = async (event: MouseEvent) => {
-  if (event.button === 0) {
-    try {
-      await appWindow.startDragging()
-    } catch (error) {
-      console.error('Failed to start dragging:', error)
-    }
-  }
-}
 </script>
