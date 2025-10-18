@@ -84,13 +84,7 @@
           :disabled="initializing || loading"
           @click="handleInitialize"
         >
-          <span v-if="initializing" class="panel-action__loading">
-            <svg class="panel-action__spinner" viewBox="0 0 24 24" fill="none">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-            </svg>
-            <span>正在初始化...</span>
-          </span>
+          <span v-if="initializing">正在初始化...</span>
           <span v-else>开始初始化</span>
         </button>
       </footer>
