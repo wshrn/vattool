@@ -45,72 +45,340 @@
 }
 
 @layer components {
+  .app-shell {
+    @apply w-full text-gray-900 dark:text-gray-100 transition-colors duration-500 ease-apple relative overflow-hidden;
+    background: radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.25), transparent 45%),
+      radial-gradient(circle at 100% 0%, rgba(14, 165, 233, 0.25), transparent 55%),
+      linear-gradient(140deg, #f8fafc 0%, #eef2ff 45%, #f1f5f9 100%);
+  }
+
+  html.dark .app-shell {
+    background: radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.32), transparent 45%),
+      radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.25), transparent 55%),
+      linear-gradient(160deg, #020617 0%, #0f172a 50%, #111827 100%);
+  }
+
+  .main-stage {
+    @apply relative flex items-center justify-center px-6 py-10;
+  }
+
+  .background-grid {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.7), transparent 70%);
+    mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.7), transparent 70%);
+    pointer-events: none;
+  }
+
+  html.dark .background-grid {
+    background-image: linear-gradient(rgba(71, 85, 105, 0.18) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(71, 85, 105, 0.18) 1px, transparent 1px);
+  }
+
+  .glow {
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    filter: blur(120px);
+    opacity: 0.75;
+    pointer-events: none;
+  }
+
+  .glow-primary {
+    top: 8%;
+    left: 12%;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.45), transparent 70%);
+  }
+
+  .glow-secondary {
+    bottom: 4%;
+    right: 10%;
+    background: radial-gradient(circle, rgba(14, 165, 233, 0.4), transparent 70%);
+  }
+
+  html.dark .glow {
+    opacity: 0.6;
+    filter: blur(140px);
+  }
+
+  .tech-card {
+    @apply relative w-full max-w-3xl space-y-6 border border-white/40 bg-white/80 px-8 py-8 backdrop-blur-2xl transition-colors duration-300;
+    border-radius: 28px;
+    box-shadow: 0 30px 80px -40px rgba(15, 23, 42, 0.45);
+  }
+
+  html.dark .tech-card {
+    @apply border-slate-700/70 bg-slate-900/70;
+    box-shadow: 0 40px 120px -60px rgba(15, 118, 110, 0.65);
+  }
+
+  .tech-card::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border-radius: 26px;
+    border: 1px solid rgba(226, 232, 240, 0.45);
+    pointer-events: none;
+    -webkit-mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+    mask-composite: exclude;
+    padding: 1px;
+  }
+
+  html.dark .tech-card::before {
+    border-color: rgba(100, 116, 139, 0.45);
+  }
+
+  .tech-card__header {
+    @apply flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between;
+  }
+
+  .tech-card__title {
+    @apply flex items-center gap-4;
+  }
+
+  .tech-card__badge {
+    @apply flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 text-sm font-semibold uppercase tracking-widest text-white shadow-lg shadow-blue-500/40;
+  }
+
+  .tech-card__eyebrow {
+    @apply text-xs uppercase text-slate-500 dark:text-slate-400;
+    letter-spacing: 0.28em;
+  }
+
+  .tech-card__header h1 {
+    @apply text-2xl font-semibold text-slate-900 dark:text-slate-100;
+  }
+
+  .tech-card__description {
+    @apply max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-300;
+  }
+
+  .tech-divider {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent dark:via-slate-700;
+  }
+
+  .status-grid {
+    @apply grid gap-3 sm:grid-cols-2;
+  }
+
+  .status-card {
+    @apply relative flex flex-col gap-2 rounded-2xl border border-slate-200/60 bg-white/60 p-4 text-sm text-slate-600 transition-shadow duration-300 ease-apple;
+    backdrop-filter: blur(18px);
+    box-shadow: 0 18px 40px -38px rgba(37, 99, 235, 0.65);
+  }
+
+  .status-card--success {
+    border-color: rgba(16, 185, 129, 0.35);
+  }
+
+  .status-card--error {
+    border-color: rgba(248, 113, 113, 0.35);
+  }
+
+  .status-card:hover {
+    box-shadow: 0 18px 40px -28px rgba(37, 99, 235, 0.65);
+  }
+
+  html.dark .status-card {
+    @apply border-slate-700/70 bg-slate-900/70 text-slate-300;
+    box-shadow: 0 20px 40px -36px rgba(14, 165, 233, 0.35);
+  }
+
+  html.dark .status-card--success {
+    border-color: rgba(34, 197, 94, 0.35);
+  }
+
+  html.dark .status-card--error {
+    border-color: rgba(244, 63, 94, 0.35);
+  }
+
+  .status-card__header {
+    @apply flex items-center gap-3;
+  }
+
+  .status-card__icon {
+    @apply flex h-8 w-8 items-center justify-center rounded-full border border-transparent bg-gradient-to-br from-slate-200 to-slate-100 text-slate-600 shadow-inner;
+  }
+
+  .status-card__icon.ok {
+    @apply from-emerald-200/70 to-emerald-100/70 text-emerald-600;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+  }
+
+  .status-card__icon.error {
+    @apply from-rose-200/70 to-rose-100/70 text-rose-600;
+    box-shadow: 0 0 12px rgba(244, 63, 94, 0.35);
+  }
+
+  html.dark .status-card__icon {
+    @apply bg-slate-800 text-slate-200;
+  }
+
+  .status-card__label {
+    @apply text-sm font-medium text-slate-800 dark:text-slate-100;
+  }
+
+  .status-card__message {
+    @apply text-xs leading-relaxed text-slate-600 dark:text-slate-300;
+  }
+
+  .status-card__detail {
+    @apply text-xs text-slate-500 dark:text-slate-400;
+  }
+
+  .input-stack {
+    @apply space-y-3;
+  }
+
+  .tech-label {
+    @apply text-sm font-medium text-slate-700 dark:text-slate-200;
+  }
+
+  .tech-helper {
+    @apply text-xs text-slate-500 dark:text-slate-400;
+  }
+
+  .input-apple {
+    @apply w-full rounded-2xl border border-transparent bg-white/70 px-4 py-3 text-sm font-medium text-slate-800 transition-all duration-300 ease-apple focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white disabled:opacity-70 dark:bg-slate-900/70 dark:text-slate-100 dark:focus:ring-sky-400 dark:focus:ring-offset-0;
+    backdrop-filter: blur(16px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+
   .btn-apple {
-    @apply px-4 py-2 rounded-2xl font-medium transition-all duration-200 select-none focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95;
-    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-widest transition-all duration-300 ease-apple focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:ring-sky-500;
   }
 
   .btn-primary {
-    @apply btn-apple bg-apple-blue text-white shadow-apple hover:bg-blue-600 focus:ring-blue-500;
+    @apply btn-apple relative overflow-hidden text-white;
   }
 
-  .btn-primary:hover {
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, #2563eb 0%, #7c3aed 40%, #22d3ee 100%);
+    opacity: 0.95;
+    transition: transform 0.4s ease;
+    transform: translate3d(-5%, 0, 0);
+    z-index: 0;
   }
 
-  
-  .input-apple {
-    @apply w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200;
-    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    opacity: 0.7;
   }
 
-.btn-secondary {
-    @apply btn-apple bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 focus:ring-gray-500;
+  .btn-primary:hover::before {
+    transform: translate3d(0, 0, 0) scale(1.02);
   }
 
-  .card-apple {
-    @apply bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-apple transition-all duration-200;
+  .btn-primary .button-content {
+    @apply relative z-10 flex items-center gap-2;
   }
 
-  .card-apple:hover {
-    @apply shadow-apple-lg;
+  .panel-footer {
+    @apply flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
   }
 
-  .result-item {
+  .panel-meta {
+    @apply text-xs leading-relaxed text-slate-500 dark:text-slate-400;
+  }
+
+  .notification-stack {
+    @apply space-y-2;
+  }
+
   .notification {
-    @apply p-4 rounded-2xl shadow-lg border backdrop-blur-sm transition-all duration-300 ease-apple;
+    @apply relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/80 p-4 text-sm text-slate-700 backdrop-blur-xl transition-all duration-500 ease-apple;
+    box-shadow: 0 12px 30px -24px rgba(37, 99, 235, 0.65);
   }
 
-  .notification.success {
-    @apply bg-green-100/90 border-green-200 text-green-800 dark:bg-green-900/90 dark:border-green-700 dark:text-green-200;
+  html.dark .notification {
+    @apply border-slate-700/80 bg-slate-900/70 text-slate-200;
+    box-shadow: 0 20px 44px -38px rgba(2, 132, 199, 0.45);
   }
 
-  .notification.warning {
-    @apply bg-yellow-100/90 border-yellow-200 text-yellow-800 dark:bg-yellow-900/90 dark:border-yellow-700 dark:text-yellow-200;
+  .notification::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, rgba(59, 130, 246, 0.25), transparent 60%);
+    opacity: 0.6;
+    pointer-events: none;
   }
 
-  .notification.error {
-    @apply bg-red-100/90 border-red-200 text-red-800 dark:bg-red-900/90 dark:border-red-700 dark:text-red-200;
+  .notification.success::before {
+    background: linear-gradient(120deg, rgba(34, 197, 94, 0.25), transparent 65%);
   }
 
-  .notification.info {
-    @apply bg-blue-100/90 border-blue-200 text-blue-800 dark:bg-blue-900/90 dark:border-blue-700 dark:text-blue-200;
+  .notification.error::before {
+    background: linear-gradient(120deg, rgba(244, 63, 94, 0.28), transparent 65%);
   }
 
-
-    @apply p-3 rounded-xl border transition-all duration-200 hover:shadow-md;
+  .notification.warning::before {
+    background: linear-gradient(120deg, rgba(251, 191, 36, 0.25), transparent 65%);
   }
 
-  .result-item.success {
-    @apply border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/20;
+  .notification.info::before {
+    background: linear-gradient(120deg, rgba(56, 189, 248, 0.25), transparent 65%);
   }
 
-  .result-item.error {
-    @apply border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/20;
+  .notification__title {
+    @apply text-sm font-semibold;
   }
 
-  .result-item.info {
-    @apply border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20;
+  .notification__message {
+    @apply mt-1 text-xs text-slate-600 dark:text-slate-300;
+  }
+
+  .app-title-bar {
+    @apply relative flex h-10 w-full items-center justify-between border-b border-white/40 px-4 font-medium uppercase text-slate-600 transition-colors duration-300 ease-apple backdrop-blur-xl;
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.85), rgba(226, 232, 240, 0.65));
+    cursor: move;
+  }
+
+  html.dark .app-title-bar {
+    @apply border-slate-800/80 text-slate-200;
+    background: linear-gradient(120deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.8));
+  }
+
+  .title-brand {
+    @apply relative flex items-center gap-3 font-semibold text-slate-500 dark:text-slate-300;
+    letter-spacing: 0.4em;
+  }
+
+  .title-brand__glow {
+    position: absolute;
+    inset: -12px -16px -12px -26px;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.35), transparent 65%);
+    filter: blur(22px);
+    opacity: 0.7;
+  }
+
+  .title-brand__badge {
+    @apply relative flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 font-semibold text-white;
+    font-size: 11px;
+    box-shadow: 0 10px 25px -14px rgba(79, 70, 229, 0.75);
+  }
+
+  .title-brand__label {
+    @apply relative;
+    letter-spacing: 0.35em;
+  }
+
+  .title-actions {
+    @apply flex items-center gap-2;
   }
 }
 
