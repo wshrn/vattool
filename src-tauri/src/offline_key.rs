@@ -13,6 +13,7 @@ use rsa::{pkcs8::DecodePrivateKey, Oaep, RsaPrivateKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
+    convert::TryInto,
     fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -152,9 +153,12 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
         return Err(OfflineKeyError::InvalidData("离线时间数据损坏".into()));
     }
     let (nonce_bytes, ciphertext) = combined.split_at(12);
+    let nonce_array: [u8; 12] = nonce_bytes
+        .try_into()
+        .map_err(|_| OfflineKeyError::InvalidData("离线时间数据损坏".into()))?;
     let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
-    let nonce = Nonce::clone_from_slice(nonce_bytes);
+    let nonce = Nonce::from(nonce_array);
     let plaintext = cipher
         .decrypt(&nonce, ciphertext)
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 解密失败: {err}")))?;
@@ -174,9 +178,8 @@ fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
     let ciphertext = cipher
         .encrypt(&nonce, now.to_rfc3339().as_bytes())
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
-    let nonce_slice = nonce.as_slice();
-    let mut combined = Vec::with_capacity(nonce_slice.len() + ciphertext.len());
-    combined.extend_from_slice(nonce_slice);
+    let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
+    combined.extend_from_slice(&nonce_bytes);
     combined.extend_from_slice(&ciphertext);
     Ok(general_purpose::STANDARD.encode(combined))
 }
