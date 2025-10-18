@@ -2,14 +2,14 @@ use crate::FileWriteLock;
 use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Map, Value};
 use std::{collections::HashMap, fs, path::PathBuf};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 pub const TOOLBOX_THEME_ENV_NAME: &str = "ZHIGONG_TOOLBOX_THEME";
 const CONFIG_FILE_NAME: &str = "settings.json";
 
-pub fn ensure_config_dir(app: &impl tauri::Manager) -> Result<()> {
+pub fn ensure_config_dir(app: &tauri::AppHandle) -> Result<()> {
     let path = app
-        .path_resolver()
+        .path()
         .app_config_dir()
         .ok_or_else(|| anyhow!("无法定位配置目录"))?;
     fs::create_dir_all(&path).with_context(|| format!("无法创建配置目录: {}", path.display()))?;
@@ -19,7 +19,7 @@ pub fn ensure_config_dir(app: &impl tauri::Manager) -> Result<()> {
 fn config_path(app: &tauri::AppHandle) -> Result<PathBuf> {
     ensure_config_dir(app)?;
     let dir = app
-        .path_resolver()
+        .path()
         .app_config_dir()
         .ok_or_else(|| anyhow!("无法定位配置目录"))?;
     Ok(dir.join(CONFIG_FILE_NAME))
