@@ -132,6 +132,10 @@
     z-index: 1;
   }
 
+  .panel-section--mirrors {
+    z-index: 3;
+  }
+
   .panel-header {
     @apply space-y-4;
   }
