@@ -1,11 +1,21 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-500 ease-apple">
+  <div ref="appShellRef" class="app-shell">
     <TitleBar />
-    <main class="max-w-4xl mx-auto px-6 py-10">
-      <section class="card-apple p-8 space-y-6 animate-slide-up">
+    <main ref="mainRef" class="relative flex justify-center px-6 py-6">
+      <div aria-hidden="true" class="pointer-events-none absolute inset-0">
+        <div class="absolute -top-24 right-0 h-64 w-64 rounded-full bg-gradient-to-br from-sky-400/40 via-blue-500/30 to-purple-500/40 blur-3xl"></div>
+        <div class="absolute bottom-[-80px] left-[-120px] h-72 w-72 rounded-full bg-gradient-to-br from-emerald-400/30 via-cyan-400/20 to-transparent blur-3xl"></div>
+        <div class="absolute top-1/2 left-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-white/40 via-blue-100/20 to-transparent blur-2xl dark:from-slate-500/30 dark:via-blue-500/20"></div>
+      </div>
+      <section ref="cardRef" class="card-apple mx-auto w-full max-w-3xl space-y-8">
         <header class="space-y-2">
-          <h1 class="text-2xl font-semibold tracking-tight">Python 环境初始化助手</h1>
-          <p class="text-sm text-gray-600 dark:text-gray-400">在当前目录快速检测并初始化 Python 运行环境，同时支持国内常见镜像源配置。</p>
+          <span class="inline-flex items-center rounded-full bg-blue-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">
+            Smart Environment Toolkit
+          </span>
+          <h1 class="text-3xl font-semibold tracking-tight">Python 环境初始化助手</h1>
+          <p class="text-sm leading-relaxed text-gray-600 dark:text-slate-300">
+            在当前目录快速检测并初始化 Python 运行环境，同时支持国内常见镜像源配置。
+          </p>
         </header>
 
         <div class="grid gap-3">
@@ -24,7 +34,7 @@
         </div>
 
         <div class="space-y-3">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">选择默认 pip 国内镜像源</label>
+          <label class="block text-sm font-medium text-gray-800 dark:text-gray-200">选择默认 pip 国内镜像源</label>
           <select
             v-model="selectedMirror"
             class="input-apple"
@@ -43,14 +53,14 @@
           </p>
         </div>
 
-        <div class="flex items-center justify-between">
-          <div class="text-xs text-gray-500 dark:text-gray-400">
+        <div class="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/30 p-4 text-xs text-gray-600 shadow-inner backdrop-blur-lg dark:border-white/5 dark:bg-slate-900/50 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+          <div class="space-y-1">
             <p>当前 Python 路径：{{ status?.pythonPath ?? '未检测到' }}</p>
             <p>Scripts 目录：{{ status?.scriptsPath ?? '未检测到' }}</p>
             <p>当前镜像：{{ status?.pipMirrorConfigured.currentMirror ?? '未检测到' }}</p>
           </div>
           <button
-            class="btn-primary px-6 py-3 text-sm"
+            class="btn-primary px-6 py-3 text-sm shadow-lg shadow-blue-500/20"
             :disabled="initializing || loading"
             @click="handleInitialize"
           >
@@ -82,9 +92,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import TitleBar from './components/TitleBar.vue'
 import { fetchPythonEnvStatus, initializePythonEnvironment, type PythonEnvStatus } from './services/pythonEnv'
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
 
 interface NotificationItem {
   id: number
@@ -99,6 +110,12 @@ const initializing = ref(false)
 const selectedMirror = ref('https://pypi.tuna.tsinghua.edu.cn/simple')
 const notifications = reactive<NotificationItem[]>([])
 let notificationSeed = 0
+const appShellRef = ref<HTMLElement | null>(null)
+const mainRef = ref<HTMLElement | null>(null)
+const cardRef = ref<HTMLElement | null>(null)
+const appWindow = getCurrentWindow()
+let resizeObserver: ResizeObserver | null = null
+let resizeAnimationFrame: number | null = null
 
 const mirrorOptions = computed(() => status.value?.mirrorCandidates ?? [
   {
@@ -146,6 +163,8 @@ const loadStatus = async () => {
   try {
     status.value = await fetchPythonEnvStatus()
     synchronizeMirrorSelection()
+    await nextTick()
+    synchronizeWindowSize()
   } catch (error) {
     console.error(error)
     pushNotification({
@@ -171,6 +190,8 @@ const handleInitialize = async () => {
       message: 'Python 环境变量与国内镜像已配置。',
       type: 'success',
     })
+    await nextTick()
+    synchronizeWindowSize()
   } catch (error) {
     console.error(error)
     pushNotification({
@@ -184,6 +205,102 @@ const handleInitialize = async () => {
 }
 
 onMounted(async () => {
+  if (appShellRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      synchronizeWindowSize()
+    })
+    resizeObserver.observe(appShellRef.value)
+  }
+
+  await nextTick()
+
+  if (mainRef.value) {
+    resizeObserver?.observe(mainRef.value)
+  }
+
+  if (cardRef.value) {
+    resizeObserver?.observe(cardRef.value)
+  }
+
+  synchronizeWindowSize()
   await loadStatus()
+})
+
+onBeforeUnmount(async () => {
+  resizeObserver?.disconnect()
+  if (resizeAnimationFrame !== null) {
+    cancelAnimationFrame(resizeAnimationFrame)
+  }
+  try {
+    await appWindow.setMinSize(null)
+    await appWindow.setMaxSize(null)
+  } catch (error) {
+    console.error('Failed to reset window constraints:', error)
+  }
+})
+
+const parsePxValue = (value: string) => Number.parseFloat(value) || 0
+
+const synchronizeWindowSize = () => {
+  const shellElement = appShellRef.value
+  if (!shellElement) {
+    return
+  }
+
+  if (resizeAnimationFrame !== null) {
+    cancelAnimationFrame(resizeAnimationFrame)
+  }
+
+  resizeAnimationFrame = requestAnimationFrame(async () => {
+    const cardElement = cardRef.value
+    const mainElement = mainRef.value
+    const shellRect = shellElement.getBoundingClientRect()
+    const cardRect = cardElement?.getBoundingClientRect()
+
+    const mainStyles = mainElement ? window.getComputedStyle(mainElement) : null
+    const horizontalPadding =
+      mainStyles ? parsePxValue(mainStyles.paddingLeft) + parsePxValue(mainStyles.paddingRight) : 0
+    const verticalPadding =
+      mainStyles ? parsePxValue(mainStyles.paddingTop) + parsePxValue(mainStyles.paddingBottom) : 0
+
+    const titleBarElement = shellElement.querySelector<HTMLElement>('.titlebar')
+    const titleBarHeight = titleBarElement ? titleBarElement.getBoundingClientRect().height : 0
+
+    let width = Math.ceil(shellRect.width)
+    let height = Math.ceil(shellRect.height)
+
+    if (cardRect) {
+      const verticalBuffer = 24
+      width = Math.ceil(cardRect.width + horizontalPadding)
+      height = Math.ceil(cardRect.height + verticalPadding + titleBarHeight + verticalBuffer)
+    }
+
+    try {
+      const size = new LogicalSize(width, height)
+      await appWindow.setSize(size)
+      await appWindow.setMinSize(size)
+      await appWindow.setMaxSize(size)
+    } catch (error) {
+      console.error('Failed to synchronize window size:', error)
+    }
+  })
+}
+
+watch(status, async () => {
+  await nextTick()
+  synchronizeWindowSize()
+})
+
+watch(
+  () => notifications.length,
+  async () => {
+    await nextTick()
+    synchronizeWindowSize()
+  },
+)
+
+watch(initializing, async () => {
+  await nextTick()
+  synchronizeWindowSize()
 })
 </script>
