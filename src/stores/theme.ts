@@ -99,7 +99,15 @@ export const useThemeStore = defineStore('theme', () => {
     await fetchInitialTheme()
   }
 
-  const setTheme = async (next: ThemeMode) => {
+  const persistTheme = async (next: ThemeMode) => {
+    try {
+      await invoke('save_config', { key: 'theme', value: next })
+    } catch (error) {
+      console.error('保存主题失败', error)
+    }
+  }
+
+  const setTheme = (next: ThemeMode) => {
     theme.value = next
     applyTheme()
 
@@ -108,11 +116,7 @@ export const useThemeStore = defineStore('theme', () => {
     }
 
     if (isTauri()) {
-      try {
-        await invoke('save_config', { key: 'theme', value: next })
-      } catch (error) {
-        console.error('保存主题失败', error)
-      }
+      void persistTheme(next)
     }
   }
 

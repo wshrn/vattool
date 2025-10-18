@@ -54,6 +54,58 @@ fn with_lock<T>(lock: &FileWriteLock, task: impl FnOnce() -> Result<T>) -> Resul
     result
 }
 
+#[cfg(target_os = "windows")]
+mod platform {
+    use anyhow::Result;
+    use windows::core::w;
+    use windows::Win32::Foundation::{LPARAM, WPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
+    };
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+
+    pub fn set_env(name: &str, value: &str) -> Result<()> {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (env, _) = hkcu.create_subkey("Environment")?;
+        env.set_value(name, value)?;
+        Ok(())
+    }
+
+    pub fn broadcast_environment_change() {
+        unsafe {
+            let param = w!("Environment");
+            let _ = SendMessageTimeoutW(
+                HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                WPARAM::default(),
+                LPARAM(param.as_ptr() as isize),
+                SMTO_ABORTIFHUNG,
+                5000,
+                None,
+            );
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+mod platform {
+    use anyhow::Result;
+
+    pub fn set_env(name: &str, value: &str) -> Result<()> {
+        std::env::set_var(name, value);
+        Ok(())
+    }
+
+    pub fn broadcast_environment_change() {}
+}
+
+fn sync_theme_environment(value: &str) -> Result<()> {
+    platform::set_env(TOOLBOX_THEME_ENV_NAME, value)?;
+    platform::broadcast_environment_change();
+    Ok(())
+}
+
 fn sanitize_theme(theme: &str) -> &str {
     match theme {
         "light" | "dark" | "auto" => theme,
@@ -93,16 +145,24 @@ pub fn save_config(
 ) -> Result<(), String> {
     let should_emit_theme = key == "theme";
     let path = config_path(&app).map_err(|err| err.to_string())?;
+    let value_to_persist = if should_emit_theme {
+        sanitize_theme(&value).to_string()
+    } else {
+        value.clone()
+    };
 
     with_lock(lock.inner(), || {
         let mut map = load_config(&path)?;
-        map.insert(key.clone(), json!(value));
+        map.insert(key.clone(), json!(value_to_persist.clone()));
         save_config_map(&path, &map)?;
         Ok(())
     })
     .map_err(|err| err.to_string())?;
 
     if should_emit_theme {
+        if let Err(err) = sync_theme_environment(&value_to_persist) {
+            eprintln!("同步主题环境变量失败: {err}");
+        }
         emit_theme_update(&app);
     }
 
