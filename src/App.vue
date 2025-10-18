@@ -6,7 +6,6 @@
     <main class="app-panel">
       <header class="panel-header">
         <div class="panel-header__meta">
-          <span class="panel-chip">Environment Sync</span>
           <span class="panel-header__pulse" />
         </div>
         <div>
