@@ -1,6 +1,7 @@
 use crate::FileWriteLock;
 
 // 标准库
+use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -21,35 +22,50 @@ use rsa::{Oaep, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use tauri::async_runtime;
 use tauri::State;
 use thiserror::Error;
-use tokio::fs;
 use uuid::Uuid;
 
 // RSA 私钥（2048位）- 用于解密许可证信息
 const OFFLINE_RSA_PRIVATE_KEY: &str = r"-----BEGIN PRIVATE KEY-----
-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
+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
+tf48SkBaDknGHpihfb3iEnE=
 -----END PRIVATE KEY-----";
 
 // RSA 公钥（2048位）- 用于生成密钥时加密
 const OFFLINE_RSA_PUBLIC_KEY: &str = r"-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1Sk9PHMbScoZMZfQNPuq
-Oz0eRDddhP4GlV0iJ2P4PRoE3gnGlwZuxYn6LBQmlRnL5oya4cU2jbKf+1TPku4y
-VX5iGLlZ8IYRnYrOYiZRvHy9npBtXNR7UocSu73K4b/JQ63N8xCG19b+q/bMuE/I
-GR/KXoOnZ85jCh0T4VxrHK9kiB598bHZD/5AmPuJjrES3VdCBEoaNAbDQluLJk6e
-Jcfc2SjPUOgzRetgf9hneL/r04saIKLkFW0ibKU4PwG0cfrJ2W719RXtnSNaRb6L
-Fjv64fytlreD1vSlKEDkF7dVlFiEL+fuBUCPNs3EUdAblH+G3z51MuuJrG/HH1AP
-tQIDAQAB
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuECxYS4Z+Ff6ZHRSDI/Y
+xZ4xWxHZ1lQl0PS14Q7X0Vl8WsLcdK/NODKGxHduc/IiP58SXSqWybO05vFB2/rq
+if83ydpeow45A2w0o1ejFpoJ5qLBXTkz2D059k41Y81qVwd6/WObDErxdP9/9VjF
+gHYX9jWm3oeXn5ZknkNVL/QtEOlV77hQkp+1KDAgyzh1yTUDkaaHYIgtae1ZeWcr
+SrXHXFYufwHIy/1zSDiyZNJ+/rp8z9TZWvaCgSYM1dhQfXnLsaQK8EOnUK1vQEV7
+R0EL+JdKtP49XiP+h52b5On9cbiZkIzhODls2uE8M+jVs4vtkUqymgrKl/9aUKDT
+CQIDAQAB
 -----END PUBLIC KEY-----";
 
 // AES-256 密钥（Base64 编码）- 用于时间戳加密
@@ -61,20 +77,95 @@ pub const OFFLINE_KEY_SEPARATOR: &str = "|||";
 // 环境变量名称
 pub const OFFLINE_KEY_ENV_NAME: &str = "keyzhigongfile";
 
+const OFFLINE_RSA_PRIVATE_KEY_ENV: &str = "ZHIGONG_OFFLINE_RSA_PRIVATE_KEY";
+const OFFLINE_RSA_PRIVATE_KEY_PATH_ENV: &str = "ZHIGONG_OFFLINE_RSA_PRIVATE_KEY_PATH";
+
 // 懒加载初始化加密密钥
-static PRIVATE_KEY: Lazy<RsaPrivateKey> =
-    Lazy::new(|| RsaPrivateKey::from_pkcs8_pem(OFFLINE_RSA_PRIVATE_KEY).expect("无效的 RSA 私钥"));
+static PRIVATE_KEY: Lazy<Result<RsaPrivateKey, String>> = Lazy::new(|| {
+    let pem = match resolve_private_key_pem() {
+        Ok(value) => value,
+        Err(err) => return Err(err),
+    };
+
+    parse_private_key(&pem)
+});
 
 #[allow(dead_code)]
-static PUBLIC_KEY: Lazy<RsaPublicKey> = Lazy::new(|| {
-    RsaPublicKey::from_public_key_pem(OFFLINE_RSA_PUBLIC_KEY).expect("无效的 RSA 公钥")
+static PUBLIC_KEY: Lazy<Result<RsaPublicKey, String>> = Lazy::new(|| {
+    RsaPublicKey::from_public_key_pem(OFFLINE_RSA_PUBLIC_KEY)
+        .map_err(|err| format!("加载 RSA 公钥失败: {err}"))
 });
 
-static AES_KEY: Lazy<Vec<u8>> = Lazy::new(|| {
+static AES_KEY: Lazy<Result<Vec<u8>, String>> = Lazy::new(|| {
     general_purpose::STANDARD
         .decode(OFFLINE_AES_KEY_B64)
-        .expect("无效的 AES 密钥")
+        .map_err(|err| format!("加载 AES 密钥失败: {err}"))
 });
+
+fn get_private_key() -> Result<&'static RsaPrivateKey, OfflineKeyError> {
+    PRIVATE_KEY
+        .as_ref()
+        .map_err(|err| OfflineKeyError::Crypto(err.clone()))
+}
+
+#[allow(dead_code)]
+fn get_public_key() -> Result<&'static RsaPublicKey, OfflineKeyError> {
+    PUBLIC_KEY
+        .as_ref()
+        .map_err(|err| OfflineKeyError::Crypto(err.clone()))
+}
+
+fn get_aes_key() -> Result<&'static [u8], OfflineKeyError> {
+    AES_KEY
+        .as_ref()
+        .map(|key| key.as_slice())
+        .map_err(|err| OfflineKeyError::Crypto(err.clone()))
+}
+
+fn resolve_private_key_pem() -> Result<String, String> {
+    if let Some(path) = read_env_var(OFFLINE_RSA_PRIVATE_KEY_PATH_ENV) {
+        let path_buf = PathBuf::from(&path);
+        return std::fs::read_to_string(&path_buf)
+            .map_err(|err| format!("无法从 {} 读取 RSA 私钥: {err}", path_buf.display()));
+    }
+
+    if let Some(pem) = read_env_var(OFFLINE_RSA_PRIVATE_KEY_ENV) {
+        return Ok(pem);
+    }
+
+    Ok(OFFLINE_RSA_PRIVATE_KEY.to_string())
+}
+
+fn parse_private_key(pem: &str) -> Result<RsaPrivateKey, String> {
+    let normalized = normalize_private_key_pem(pem);
+    RsaPrivateKey::from_pkcs8_pem(&normalized).map_err(|err| format!("加载 RSA 私钥失败: {err}"))
+}
+
+fn normalize_private_key_pem(pem: &str) -> String {
+    let trimmed = pem.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    if trimmed.contains("-----BEGIN") {
+        trimmed.to_string()
+    } else {
+        let mut wrapped = String::from("-----BEGIN PRIVATE KEY-----\n");
+        wrapped.push_str(trimmed);
+        if !trimmed.ends_with('\n') {
+            wrapped.push('\n');
+        }
+        wrapped.push_str("-----END PRIVATE KEY-----");
+        wrapped
+    }
+}
+
+fn read_env_var(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
 
 #[derive(Error, Debug)]
 pub enum OfflineKeyError {
@@ -203,7 +294,7 @@ fn shorten_hex(hex: String) -> Option<String> {
 }
 
 fn decrypt_license_payload(encoded: &str) -> Result<OfflineLicensePayload, OfflineKeyError> {
-    let private_key = &*PRIVATE_KEY;
+    let private_key = get_private_key()?;
 
     let encrypted = general_purpose::STANDARD
         .decode(encoded)
@@ -229,13 +320,18 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
         return Err(OfflineKeyError::InvalidData("离线时间数据损坏".into()));
     }
 
-    let (nonce, ciphertext) = combined.split_at(12);
+    let (nonce_bytes, ciphertext) = combined.split_at(12);
 
-    let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
+    let nonce_array: [u8; 12] = nonce_bytes
+        .try_into()
+        .map_err(|_| OfflineKeyError::InvalidData("离线时间数据损坏".into()))?;
+    let nonce = Nonce::from(nonce_array);
+
+    let cipher = Aes256Gcm::new_from_slice(get_aes_key()?)
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
 
     let plaintext = cipher
-        .decrypt(Nonce::from_slice(nonce), ciphertext)
+        .decrypt(&nonce, ciphertext)
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 解密失败: {err}")))?;
 
     let time_str = String::from_utf8(plaintext)
@@ -247,14 +343,16 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
 }
 
 fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
-    let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
+    let cipher = Aes256Gcm::new_from_slice(get_aes_key()?)
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
 
     let mut nonce_bytes = [0u8; 12];
     OsRng.fill_bytes(&mut nonce_bytes);
 
+    let nonce = Nonce::from(nonce_bytes);
+
     let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce_bytes), now.to_rfc3339().as_bytes())
+        .encrypt(&nonce, now.to_rfc3339().as_bytes())
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
 
     let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
@@ -282,11 +380,18 @@ async fn read_file_with_lock(
     path: &Path,
     lock: &Arc<Mutex<()>>,
 ) -> Result<String, OfflineKeyError> {
-    let _guard = lock
-        .lock()
-        .map_err(|_| OfflineKeyError::InvalidData("获取文件锁失败".into()))?;
+    let path = path.to_path_buf();
+    let lock = Arc::clone(lock);
 
-    fs::read_to_string(path).await.map_err(OfflineKeyError::Io)
+    async_runtime::spawn_blocking(move || {
+        let _guard = lock
+            .lock()
+            .map_err(|_| OfflineKeyError::InvalidData("获取文件锁失败".into()))?;
+
+        std::fs::read_to_string(path).map_err(OfflineKeyError::Io)
+    })
+    .await
+    .map_err(|err| OfflineKeyError::InvalidData(format!("读取离线密钥失败: {err}")))?
 }
 
 async fn write_file_with_lock(
@@ -294,11 +399,19 @@ async fn write_file_with_lock(
     content: &[u8],
     lock: &Arc<Mutex<()>>,
 ) -> Result<(), OfflineKeyError> {
-    let _guard = lock
-        .lock()
-        .map_err(|_| OfflineKeyError::InvalidData("获取文件锁失败".into()))?;
+    let path = path.to_path_buf();
+    let data = content.to_vec();
+    let lock = Arc::clone(lock);
 
-    fs::write(path, content).await.map_err(OfflineKeyError::Io)
+    async_runtime::spawn_blocking(move || {
+        let _guard = lock
+            .lock()
+            .map_err(|_| OfflineKeyError::InvalidData("获取文件锁失败".into()))?;
+
+        std::fs::write(path, data).map_err(OfflineKeyError::Io)
+    })
+    .await
+    .map_err(|err| OfflineKeyError::InvalidData(format!("写入离线密钥失败: {err}")))?
 }
 
 async fn try_validate_from_env(
