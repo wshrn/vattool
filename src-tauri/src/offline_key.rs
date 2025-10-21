@@ -1,6 +1,5 @@
 use crate::FileWriteLock;
 use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit, Nonce};
-use anyhow::Result;
 use base64::engine::general_purpose;
 use base64::Engine;
 use chrono::{DateTime, Utc};
@@ -9,8 +8,11 @@ use machine_uid::get as get_machine_uid;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use rand::RngCore;
-use rsa::{pkcs1v15::Pkcs1v15Encrypt, pkcs8::DecodePrivateKey, Oaep, RsaPrivateKey};
+use rsa::{
+    pkcs1v15::Pkcs1v15Encrypt, pkcs8::DecodePrivateKey, traits::PublicKeyParts, Oaep, RsaPrivateKey,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::{
@@ -22,7 +24,7 @@ use std::{
 use thiserror::Error;
 use uuid::Uuid;
 
-const OFFLINE_RSA_PRIVATE_KEY: &str = r"-----BEGIN PRIVATE KEY-----
+const DEFAULT_OFFLINE_RSA_PRIVATE_KEY: &str = r"-----BEGIN PRIVATE KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCydjvCe9dSjiNe
 HYoZsty/TffOevm3B803yOdu3YkP3IFtjTJbQvzXmZjH96E315WccXW0lG3Npjzq
 8n8VJ5t29MNizW9ck3jJoKDzSkXfFtO8e4ergz4PovRLFkh+gKxPC6RoWAm9c2w9
@@ -50,21 +52,16 @@ clpoYEj6FOPgmhQ9E5BJoBH4epM+c/Vu9JK2fi6XivT5lxH/dWF7B5uf9APUqtf/
 CDlno4vHTRWwc7jcWCjYTr8HkXXk2yZx0O7hmi1Nritj8fDPnZZsjusVcTWjkD2P
 FiGkZG9JMgvYIbk35WnPeiSK
 -----END PRIVATE KEY-----";
-const OFFLINE_AES_KEY_B64: &str = "deG64Nsdhem0HpZE2Gm/vj6VE5hGNRDhTsaw/PNxMS8=";
+const DEFAULT_OFFLINE_AES_KEY_B64: &str = "94/AR7dd8gIstLEXp3LCs865DptiMKlh8nLjjDEcO40=";
 pub const OFFLINE_KEY_SEPARATOR: &str = "|||";
 pub const OFFLINE_KEY_ENV_NAME: &str = "keyzhigongfile";
 
-static PRIVATE_KEY: Lazy<RsaPrivateKey> = Lazy::new(|| {
-    RsaPrivateKey::from_pkcs8_pem(OFFLINE_RSA_PRIVATE_KEY).expect("invalid offline private key")
-});
-
-static AES_KEY: Lazy<[u8; 32]> = Lazy::new(|| {
-    let decoded = general_purpose::STANDARD
-        .decode(OFFLINE_AES_KEY_B64)
-        .expect("invalid AES key");
-    decoded
-        .try_into()
-        .expect("AES key must be 32 bytes for AES-256")
+const OFFLINE_RSA_PRIVATE_KEY_ENV: &str = "OFFLINE_RSA_PRIVATE_KEY";
+const OFFLINE_RSA_PRIVATE_KEY_PATH_ENV: &str = "OFFLINE_RSA_PRIVATE_KEY_PATH";
+const OFFLINE_AES_KEY_ENV: &str = "OFFLINE_AES_KEY_B64";
+static DEFAULT_PRIVATE_KEY: Lazy<RsaPrivateKey> = Lazy::new(|| {
+    RsaPrivateKey::from_pkcs8_pem(DEFAULT_OFFLINE_RSA_PRIVATE_KEY)
+        .expect("invalid embedded offline private key")
 });
 
 #[derive(Debug, Error)]
@@ -101,6 +98,57 @@ pub struct OfflineKeyValidationResult {
     pub payload: Option<OfflineLicensePayload>,
 }
 
+impl OfflineLicensePayload {
+    fn from_value(value: &Value) -> Result<Self, OfflineKeyError> {
+        let object = value
+            .as_object()
+            .ok_or_else(|| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
+
+        let user_id = object
+            .get("userId")
+            .and_then(parse_u32_value)
+            .ok_or_else(|| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
+
+        let username = object
+            .get("username")
+            .and_then(parse_string_value)
+            .ok_or_else(|| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
+
+        let email = object
+            .get("email")
+            .and_then(parse_string_value)
+            .ok_or_else(|| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
+
+        let device_id = object
+            .get("deviceId")
+            .and_then(parse_string_value)
+            .ok_or_else(|| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
+
+        if device_id.len() != 32 {
+            return Err(OfflineKeyError::InvalidData("设备标识格式无效".into()));
+        }
+
+        let expires_at = object
+            .get("expiresAt")
+            .and_then(parse_string_value)
+            .ok_or_else(|| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
+
+        let issued_at = object
+            .get("issuedAt")
+            .and_then(parse_string_value)
+            .ok_or_else(|| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
+
+        Ok(Self {
+            user_id,
+            username,
+            email,
+            device_id,
+            expires_at,
+            issued_at,
+        })
+    }
+}
+
 fn read_file_with_lock(path: &Path, lock: &Arc<Mutex<()>>) -> Result<String, OfflineKeyError> {
     let guard = lock.lock().map_err(|_| OfflineKeyError::Poison)?;
     let content = fs::read_to_string(path).map_err(|err| OfflineKeyError::Io(err.to_string()))?;
@@ -134,26 +182,141 @@ fn combine_offline_key(rsa_part: &str, aes_part: &str) -> String {
     format!("{rsa_part}{OFFLINE_KEY_SEPARATOR}{aes_part}")
 }
 
+fn load_private_keys() -> Result<Vec<RsaPrivateKey>, OfflineKeyError> {
+    let mut keys = Vec::new();
+
+    if let Ok(path) = std::env::var(OFFLINE_RSA_PRIVATE_KEY_PATH_ENV) {
+        let pem = fs::read_to_string(&path)
+            .map_err(|err| OfflineKeyError::Io(format!("无法读取 RSA 私钥文件: {err}")))?;
+        let key = parse_private_key(pem.trim())?;
+        push_unique_key(&mut keys, key);
+    }
+
+    if let Ok(pem) = std::env::var(OFFLINE_RSA_PRIVATE_KEY_ENV) {
+        let trimmed = pem.trim();
+        if !trimmed.is_empty() {
+            let key = parse_private_key(trimmed)?;
+            push_unique_key(&mut keys, key);
+        }
+    }
+
+    push_unique_key(&mut keys, DEFAULT_PRIVATE_KEY.clone());
+
+    Ok(keys)
+}
+
+fn push_unique_key(keys: &mut Vec<RsaPrivateKey>, candidate: RsaPrivateKey) {
+    let exists = keys
+        .iter()
+        .any(|key| key.n() == candidate.n() && key.e() == candidate.e());
+    if !exists {
+        keys.push(candidate);
+    }
+}
+
+fn parse_private_key(pem: &str) -> Result<RsaPrivateKey, OfflineKeyError> {
+    RsaPrivateKey::from_pkcs8_pem(pem)
+        .map_err(|err| OfflineKeyError::Crypto(format!("RSA 私钥解析失败: {err}")))
+}
+
+fn decode_aes_key_bytes() -> Result<[u8; 32], OfflineKeyError> {
+    let key_b64 = std::env::var(OFFLINE_AES_KEY_ENV)
+        .map(|value| value.trim().to_string())
+        .unwrap_or_else(|_| DEFAULT_OFFLINE_AES_KEY_B64.to_string());
+
+    let decoded = general_purpose::STANDARD
+        .decode(key_b64.as_bytes())
+        .map_err(|_| OfflineKeyError::InvalidData("AES 密钥格式无效".into()))?;
+
+    decoded
+        .try_into()
+        .map_err(|_| OfflineKeyError::InvalidData("AES 密钥长度必须为 32 字节".into()))
+}
+
 fn decrypt_license_payload(encoded: &str) -> Result<OfflineLicensePayload, OfflineKeyError> {
     let encrypted = general_purpose::STANDARD
         .decode(encoded)
         .map_err(|_| OfflineKeyError::InvalidData("RSA 密文格式无效".into()))?;
-    let decrypted = match PRIVATE_KEY.decrypt(Oaep::new::<Sha256>(), &encrypted) {
-        Ok(data) => data,
-        Err(err_sha256) => match PRIVATE_KEY.decrypt(Oaep::new::<Sha1>(), &encrypted) {
-            Ok(data) => data,
-            Err(err_sha1) => match PRIVATE_KEY.decrypt(Pkcs1v15Encrypt, &encrypted) {
-                Ok(data) => data,
-                Err(err_pkcs1) => {
-                    return Err(OfflineKeyError::Crypto(format!(
-                        "RSA 解密失败: {err_sha256}; {err_sha1}; {err_pkcs1}"
-                    )))
-                }
-            },
-        },
-    };
-    serde_json::from_slice::<OfflineLicensePayload>(&decrypted)
-        .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))
+
+    let keys = load_private_keys()?;
+    let mut errors = Vec::new();
+
+    for key in keys {
+        match try_decrypt_with_key(&key, &encrypted) {
+            Ok(decrypted) => {
+                let value: Value = serde_json::from_slice(&decrypted)
+                    .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
+                return OfflineLicensePayload::from_value(&value);
+            }
+            Err(err) => errors.push(err),
+        }
+    }
+
+    if errors.is_empty() {
+        Err(OfflineKeyError::Crypto("未找到可用的 RSA 私钥".into()))
+    } else {
+        Err(OfflineKeyError::Crypto(format!(
+            "RSA 解密失败: {}",
+            errors.join(" | ")
+        )))
+    }
+}
+
+fn try_decrypt_with_key(key: &RsaPrivateKey, encrypted: &[u8]) -> Result<Vec<u8>, String> {
+    let mut attempts = Vec::new();
+
+    match key.decrypt(Oaep::new::<Sha256>(), encrypted) {
+        Ok(data) => return Ok(data),
+        Err(err) => attempts.push(format!("OAEP-SHA256: {err}")),
+    }
+
+    match key.decrypt(Oaep::new::<Sha1>(), encrypted) {
+        Ok(data) => return Ok(data),
+        Err(err) => attempts.push(format!("OAEP-SHA1: {err}")),
+    }
+
+    match key.decrypt(Pkcs1v15Encrypt, encrypted) {
+        Ok(data) => return Ok(data),
+        Err(err) => attempts.push(format!("PKCS1v15: {err}")),
+    }
+
+    Err(format!(
+        "{} -> {}",
+        fingerprint_private_key(key),
+        attempts.join(" | ")
+    ))
+}
+
+fn fingerprint_private_key(key: &RsaPrivateKey) -> String {
+    let modulus = key.n().to_bytes_be();
+    let digest = Sha256::digest(modulus);
+    digest
+        .iter()
+        .take(8)
+        .map(|byte| format!("{:02x}", byte))
+        .collect::<String>()
+}
+
+fn parse_u32_value(value: &Value) -> Option<u32> {
+    if let Some(number) = value.as_u64() {
+        return number.try_into().ok();
+    }
+
+    if let Some(number) = value.as_i64() {
+        if number >= 0 {
+            return (number as u64).try_into().ok();
+        }
+    }
+
+    value.as_str().and_then(|s| s.trim().parse::<u32>().ok())
+}
+
+fn parse_string_value(value: &Value) -> Option<String> {
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
 }
 
 fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> {
@@ -164,14 +327,11 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
         return Err(OfflineKeyError::InvalidData("离线时间数据损坏".into()));
     }
     let (nonce_bytes, ciphertext) = combined.split_at(12);
-    let nonce_array: [u8; 12] = nonce_bytes
-        .try_into()
-        .map_err(|_| OfflineKeyError::InvalidData("离线时间数据损坏".into()))?;
-    let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
+    let key_bytes = decode_aes_key_bytes()?;
+    let cipher = Aes256Gcm::new_from_slice(&key_bytes[..])
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
-    let nonce = Nonce::from(nonce_array);
     let plaintext = cipher
-        .decrypt(&nonce, ciphertext)
+        .decrypt(Nonce::from_slice(nonce_bytes), ciphertext)
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 解密失败: {err}")))?;
     let time_str = String::from_utf8(plaintext)
         .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()))?;
@@ -181,15 +341,14 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
 }
 
 fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
-    let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
+    let key_bytes = decode_aes_key_bytes()?;
+    let cipher = Aes256Gcm::new_from_slice(&key_bytes[..])
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
     let mut nonce_bytes = [0u8; 12];
     OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from(nonce_bytes);
     let ciphertext = cipher
-        .encrypt(&nonce, now.to_rfc3339().as_bytes())
+        .encrypt(Nonce::from_slice(&nonce_bytes), now.to_rfc3339().as_bytes())
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
-    let nonce_bytes: &[u8] = nonce.as_ref();
     let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
     combined.extend_from_slice(nonce_bytes);
     combined.extend_from_slice(&ciphertext);
@@ -216,11 +375,7 @@ fn hash_identifier(data: &[u8]) -> Option<String> {
     let mut hasher = Sha256::new();
     hasher.update(data);
     let hex = format!("{:x}", hasher.finalize());
-    if hex.is_empty() {
-        None
-    } else {
-        Some(hex.chars().take(32).collect())
-    }
+    shorten_hex(hex)
 }
 
 fn generate_device_id() -> Result<String, OfflineKeyError> {
@@ -261,13 +416,24 @@ fn generate_device_id() -> Result<String, OfflineKeyError> {
 
     let fingerprint = hasher.finalize();
     let fingerprint_hex = format!("{:x}", fingerprint);
-    let shortened: String = fingerprint_hex.chars().take(32).collect();
-    if !shortened.is_empty() {
-        return Ok(shortened);
+    if let Some(id) = shorten_hex(fingerprint_hex) {
+        return Ok(id);
     }
 
     let uuid = Uuid::new_v4();
     hash_identifier(uuid.as_bytes()).ok_or_else(|| OfflineKeyError::Other("无法生成设备ID".into()))
+}
+
+fn shorten_hex(hex: String) -> Option<String> {
+    if hex.is_empty() {
+        return None;
+    }
+    let id: String = hex.chars().take(32).collect();
+    if id.is_empty() {
+        None
+    } else {
+        Some(id)
+    }
 }
 
 fn try_validate_from_env(
