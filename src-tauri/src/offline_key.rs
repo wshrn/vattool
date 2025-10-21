@@ -9,8 +9,9 @@ use machine_uid::get as get_machine_uid;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use rand::RngCore;
-use rsa::{pkcs8::DecodePrivateKey, Oaep, RsaPrivateKey};
+use rsa::{pkcs1v15::Pkcs1v15Encrypt, pkcs8::DecodePrivateKey, Oaep, RsaPrivateKey};
 use serde::{Deserialize, Serialize};
+use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::{
     convert::TryInto,
@@ -137,10 +138,20 @@ fn decrypt_license_payload(encoded: &str) -> Result<OfflineLicensePayload, Offli
     let encrypted = general_purpose::STANDARD
         .decode(encoded)
         .map_err(|_| OfflineKeyError::InvalidData("RSA 密文格式无效".into()))?;
-    let padding = Oaep::new::<Sha256>();
-    let decrypted = PRIVATE_KEY
-        .decrypt(padding, &encrypted)
-        .map_err(|err| OfflineKeyError::Crypto(format!("RSA 解密失败: {err}")))?;
+    let decrypted = match PRIVATE_KEY.decrypt(Oaep::new::<Sha256>(), &encrypted) {
+        Ok(data) => data,
+        Err(err_sha256) => match PRIVATE_KEY.decrypt(Oaep::new::<Sha1>(), &encrypted) {
+            Ok(data) => data,
+            Err(err_sha1) => match PRIVATE_KEY.decrypt(Pkcs1v15Encrypt, &encrypted) {
+                Ok(data) => data,
+                Err(err_pkcs1) => {
+                    return Err(OfflineKeyError::Crypto(format!(
+                        "RSA 解密失败: {err_sha256}; {err_sha1}; {err_pkcs1}"
+                    )))
+                }
+            },
+        },
+    };
     serde_json::from_slice::<OfflineLicensePayload>(&decrypted)
         .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))
 }
