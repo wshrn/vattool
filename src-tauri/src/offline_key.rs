@@ -1,6 +1,7 @@
 use crate::FileWriteLock;
 
 // 标准库
+use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -21,9 +22,9 @@ use rsa::{Oaep, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use tauri::async_runtime;
 use tauri::State;
 use thiserror::Error;
-use tokio::fs;
 use uuid::Uuid;
 
 // RSA 私钥（2048位）- 用于解密许可证信息
@@ -229,13 +230,18 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
         return Err(OfflineKeyError::InvalidData("离线时间数据损坏".into()));
     }
 
-    let (nonce, ciphertext) = combined.split_at(12);
+    let (nonce_bytes, ciphertext) = combined.split_at(12);
+
+    let nonce_array: [u8; 12] = nonce_bytes
+        .try_into()
+        .map_err(|_| OfflineKeyError::InvalidData("离线时间数据损坏".into()))?;
+    let nonce = Nonce::from(nonce_array);
 
     let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
 
     let plaintext = cipher
-        .decrypt(Nonce::from_slice(nonce), ciphertext)
+        .decrypt(&nonce, ciphertext)
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 解密失败: {err}")))?;
 
     let time_str = String::from_utf8(plaintext)
@@ -253,12 +259,14 @@ fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
     let mut nonce_bytes = [0u8; 12];
     OsRng.fill_bytes(&mut nonce_bytes);
 
+    let nonce = Nonce::from(nonce_bytes);
+
     let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce_bytes), now.to_rfc3339().as_bytes())
+        .encrypt(&nonce, now.to_rfc3339().as_bytes())
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
 
-    let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
-    combined.extend_from_slice(&nonce_bytes);
+    let mut combined = Vec::with_capacity(nonce.len() + ciphertext.len());
+    combined.extend_from_slice(nonce.as_slice());
     combined.extend_from_slice(&ciphertext);
 
     Ok(general_purpose::STANDARD.encode(combined))
@@ -282,11 +290,18 @@ async fn read_file_with_lock(
     path: &Path,
     lock: &Arc<Mutex<()>>,
 ) -> Result<String, OfflineKeyError> {
-    let _guard = lock
-        .lock()
-        .map_err(|_| OfflineKeyError::InvalidData("获取文件锁失败".into()))?;
+    let path = path.to_path_buf();
+    let lock = Arc::clone(lock);
 
-    fs::read_to_string(path).await.map_err(OfflineKeyError::Io)
+    async_runtime::spawn_blocking(move || {
+        let _guard = lock
+            .lock()
+            .map_err(|_| OfflineKeyError::InvalidData("获取文件锁失败".into()))?;
+
+        std::fs::read_to_string(path).map_err(OfflineKeyError::Io)
+    })
+    .await
+    .map_err(|err| OfflineKeyError::InvalidData(format!("读取离线密钥失败: {err}")))?
 }
 
 async fn write_file_with_lock(
@@ -294,11 +309,19 @@ async fn write_file_with_lock(
     content: &[u8],
     lock: &Arc<Mutex<()>>,
 ) -> Result<(), OfflineKeyError> {
-    let _guard = lock
-        .lock()
-        .map_err(|_| OfflineKeyError::InvalidData("获取文件锁失败".into()))?;
+    let path = path.to_path_buf();
+    let data = content.to_vec();
+    let lock = Arc::clone(lock);
 
-    fs::write(path, content).await.map_err(OfflineKeyError::Io)
+    async_runtime::spawn_blocking(move || {
+        let _guard = lock
+            .lock()
+            .map_err(|_| OfflineKeyError::InvalidData("获取文件锁失败".into()))?;
+
+        std::fs::write(path, data).map_err(OfflineKeyError::Io)
+    })
+    .await
+    .map_err(|err| OfflineKeyError::InvalidData(format!("写入离线密钥失败: {err}")))?
 }
 
 async fn try_validate_from_env(
