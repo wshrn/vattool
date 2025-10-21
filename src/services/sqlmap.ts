@@ -41,6 +41,10 @@ export class SqlmapAPI {
   static async validateOfflineKey(): Promise<OfflineKeyValidationResult> {
     return await invoke<OfflineKeyValidationResult>('validate_offline_key')
   }
+
+  static async getDeviceId(): Promise<string> {
+    return await invoke<string>('get_device_id')
+  }
 }
 
 export const ensureOfflineLicense = async (): Promise<boolean> => {

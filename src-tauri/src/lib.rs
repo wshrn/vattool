@@ -13,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             offline_key::validate_offline_key,
+            offline_key::get_device_id,
             python_env::get_python_environment_status,
             python_env::initialize_python_environment,
             config::tool_read_theme,
