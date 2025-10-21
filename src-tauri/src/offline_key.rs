@@ -9,13 +9,16 @@ use machine_uid::get as get_machine_uid;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use rand::RngCore;
-use rsa::{pkcs1v15::Pkcs1v15Encrypt, pkcs8::DecodePrivateKey, Oaep, RsaPrivateKey};
+use rsa::{
+    pkcs1::DecodeRsaPrivateKey, pkcs1v15::Pkcs1v15Encrypt, pkcs8::DecodePrivateKey, Oaep,
+    RsaPrivateKey,
+};
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::{
     convert::TryInto,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -50,22 +53,71 @@ clpoYEj6FOPgmhQ9E5BJoBH4epM+c/Vu9JK2fi6XivT5lxH/dWF7B5uf9APUqtf/
 CDlno4vHTRWwc7jcWCjYTr8HkXXk2yZx0O7hmi1Nritj8fDPnZZsjusVcTWjkD2P
 FiGkZG9JMgvYIbk35WnPeiSK
 -----END PRIVATE KEY-----";
-const OFFLINE_AES_KEY_B64: &str = "deG64Nsdhem0HpZE2Gm/vj6VE5hGNRDhTsaw/PNxMS8=";
+const OFFLINE_AES_KEY_B64: &str = "94/AR7dd8gIstLEXp3LCs865DptiMKlh8nLjjDEcO40=";
 pub const OFFLINE_KEY_SEPARATOR: &str = "|||";
 pub const OFFLINE_KEY_ENV_NAME: &str = "keyzhigongfile";
+const OFFLINE_RSA_PRIVATE_KEY_ENV: &str = "OFFLINE_RSA_PRIVATE_KEY";
+const OFFLINE_RSA_PRIVATE_KEY_PATH_ENV: &str = "OFFLINE_RSA_PRIVATE_KEY_PATH";
+const OFFLINE_AES_KEY_ENV: &str = "OFFLINE_AES_KEY_B64";
 
 static PRIVATE_KEY: Lazy<RsaPrivateKey> = Lazy::new(|| {
-    RsaPrivateKey::from_pkcs8_pem(OFFLINE_RSA_PRIVATE_KEY).expect("invalid offline private key")
+    let pem = resolve_private_key_pem();
+    match RsaPrivateKey::from_pkcs8_pem(&pem) {
+        Ok(key) => key,
+        Err(pkcs8_err) => RsaPrivateKey::from_pkcs1_pem(&pem).unwrap_or_else(|pkcs1_err| {
+            panic!("invalid offline private key (PKCS8: {pkcs8_err}; PKCS1: {pkcs1_err})")
+        }),
+    }
 });
 
 static AES_KEY: Lazy<[u8; 32]> = Lazy::new(|| {
+    let key_b64 = resolve_aes_key_b64();
     let decoded = general_purpose::STANDARD
-        .decode(OFFLINE_AES_KEY_B64)
+        .decode(key_b64.trim())
         .expect("invalid AES key");
     decoded
         .try_into()
         .expect("AES key must be 32 bytes for AES-256")
 });
+
+fn resolve_private_key_pem() -> String {
+    if let Ok(inline) = env::var(OFFLINE_RSA_PRIVATE_KEY_ENV) {
+        let trimmed = inline.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    if let Ok(path) = env::var(OFFLINE_RSA_PRIVATE_KEY_PATH_ENV) {
+        match fs::read_to_string(&path) {
+            Ok(content) => {
+                let trimmed = content.trim();
+                if !trimmed.is_empty() {
+                    return trimmed.to_string();
+                }
+            }
+            Err(err) => {
+                eprintln!(
+                    "failed to read offline RSA private key from {}: {}",
+                    path, err
+                );
+            }
+        }
+    }
+
+    OFFLINE_RSA_PRIVATE_KEY.to_string()
+}
+
+fn resolve_aes_key_b64() -> String {
+    if let Ok(value) = env::var(OFFLINE_AES_KEY_ENV) {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    OFFLINE_AES_KEY_B64.to_string()
+}
 
 #[derive(Debug, Error)]
 pub enum OfflineKeyError {
