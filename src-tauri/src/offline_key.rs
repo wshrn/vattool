@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::{
+    borrow::Cow,
     convert::TryInto,
     fs,
     path::{Path, PathBuf},
@@ -22,7 +23,7 @@ use std::{
 use thiserror::Error;
 use uuid::Uuid;
 
-const OFFLINE_RSA_PRIVATE_KEY: &str = r"-----BEGIN PRIVATE KEY-----
+const LEGACY_OFFLINE_RSA_PRIVATE_KEY: &str = r"-----BEGIN PRIVATE KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCydjvCe9dSjiNe
 HYoZsty/TffOevm3B803yOdu3YkP3IFtjTJbQvzXmZjH96E315WccXW0lG3Npjzq
 8n8VJ5t29MNizW9ck3jJoKDzSkXfFtO8e4ergz4PovRLFkh+gKxPC6RoWAm9c2w9
@@ -50,22 +51,154 @@ clpoYEj6FOPgmhQ9E5BJoBH4epM+c/Vu9JK2fi6XivT5lxH/dWF7B5uf9APUqtf/
 CDlno4vHTRWwc7jcWCjYTr8HkXXk2yZx0O7hmi1Nritj8fDPnZZsjusVcTWjkD2P
 FiGkZG9JMgvYIbk35WnPeiSK
 -----END PRIVATE KEY-----";
-const OFFLINE_AES_KEY_B64: &str = "deG64Nsdhem0HpZE2Gm/vj6VE5hGNRDhTsaw/PNxMS8=";
+const DEFAULT_OFFLINE_AES_KEY_B64: &str = "94/AR7dd8gIstLEXp3LCs865DptiMKlh8nLjjDEcO40=";
+const LEGACY_OFFLINE_AES_KEY_B64: &str = "deG64Nsdhem0HpZE2Gm/vj6VE5hGNRDhTsaw/PNxMS8=";
 pub const OFFLINE_KEY_SEPARATOR: &str = "|||";
 pub const OFFLINE_KEY_ENV_NAME: &str = "keyzhigongfile";
 
-static PRIVATE_KEY: Lazy<RsaPrivateKey> = Lazy::new(|| {
-    RsaPrivateKey::from_pkcs8_pem(OFFLINE_RSA_PRIVATE_KEY).expect("invalid offline private key")
+const ENV_OFFLINE_RSA_PRIVATE_KEY: &str = "VAT_OFFLINE_RSA_PRIVATE_KEY";
+const ENV_OFFLINE_RSA_PRIVATE_KEY_FILE: &str = "VAT_OFFLINE_RSA_PRIVATE_KEY_FILE";
+const ENV_OFFLINE_AES_KEY_B64: &str = "VAT_OFFLINE_AES_KEY_B64";
+
+struct PrivateKeyEntry {
+    key: RsaPrivateKey,
+    label: String,
+}
+
+struct AesKeyEntry {
+    key: [u8; 32],
+    label: String,
+}
+
+static PRIVATE_KEYS: Lazy<Vec<PrivateKeyEntry>> = Lazy::new(|| {
+    let mut entries = Vec::new();
+
+    if let Ok(value) = std::env::var(ENV_OFFLINE_RSA_PRIVATE_KEY) {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            let normalized = normalize_pem(trimmed);
+            match RsaPrivateKey::from_pkcs8_pem(normalized.as_ref()) {
+                Ok(key) => entries.push(PrivateKeyEntry {
+                    key,
+                    label: format!("env:{ENV_OFFLINE_RSA_PRIVATE_KEY}"),
+                }),
+                Err(err) => {
+                    eprintln!("无效的 RSA 私钥环境变量({ENV_OFFLINE_RSA_PRIVATE_KEY}): {err}");
+                }
+            }
+        }
+    }
+
+    if let Ok(path) = std::env::var(ENV_OFFLINE_RSA_PRIVATE_KEY_FILE) {
+        let path = PathBuf::from(path);
+        match fs::read_to_string(&path) {
+            Ok(content) => {
+                let trimmed = content.trim();
+                if !trimmed.is_empty() {
+                    let normalized = normalize_pem(trimmed);
+                    match RsaPrivateKey::from_pkcs8_pem(normalized.as_ref()) {
+                        Ok(key) => entries.push(PrivateKeyEntry {
+                            key,
+                            label: format!(
+                                "env-file:{ENV_OFFLINE_RSA_PRIVATE_KEY_FILE}:{}",
+                                path.display()
+                            ),
+                        }),
+                        Err(err) => {
+                            eprintln!("无法解析 RSA 私钥文件({}): {}", path.display(), err);
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("读取 RSA 私钥文件失败({}): {}", path.display(), err);
+            }
+        }
+    }
+
+    let builtin = RsaPrivateKey::from_pkcs8_pem(LEGACY_OFFLINE_RSA_PRIVATE_KEY)
+        .expect("invalid legacy offline private key");
+    entries.push(PrivateKeyEntry {
+        key: builtin,
+        label: "builtin-legacy".into(),
+    });
+
+    entries
 });
 
-static AES_KEY: Lazy<[u8; 32]> = Lazy::new(|| {
+static AES_KEYS: Lazy<Vec<AesKeyEntry>> = Lazy::new(|| {
+    let mut entries = Vec::new();
+
+    if let Ok(value) = std::env::var(ENV_OFFLINE_AES_KEY_B64) {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            match decode_aes_key(trimmed) {
+                Ok(key) => entries.push(AesKeyEntry {
+                    key,
+                    label: format!("env:{ENV_OFFLINE_AES_KEY_B64}"),
+                }),
+                Err(err) => {
+                    eprintln!("无效的 AES 环境变量({ENV_OFFLINE_AES_KEY_B64}): {}", err);
+                }
+            }
+        }
+    }
+
+    entries.push(AesKeyEntry {
+        key: decode_aes_key(DEFAULT_OFFLINE_AES_KEY_B64).expect("invalid default AES key"),
+        label: "default".into(),
+    });
+
+    entries.push(AesKeyEntry {
+        key: decode_aes_key(LEGACY_OFFLINE_AES_KEY_B64).expect("invalid legacy AES key"),
+        label: "legacy".into(),
+    });
+
+    entries
+});
+
+fn decode_aes_key(value: &str) -> Result<[u8; 32], String> {
     let decoded = general_purpose::STANDARD
-        .decode(OFFLINE_AES_KEY_B64)
-        .expect("invalid AES key");
+        .decode(value)
+        .map_err(|err| err.to_string())?;
     decoded
         .try_into()
-        .expect("AES key must be 32 bytes for AES-256")
-});
+        .map_err(|_| String::from("AES key must be 32 bytes for AES-256"))
+}
+
+fn normalize_pem(value: &str) -> Cow<'_, str> {
+    const BACKSLASH: u8 = 92; // '\\'
+
+    if !value.as_bytes().iter().any(|b| *b == BACKSLASH) {
+        return Cow::Borrowed(value);
+    }
+
+    let mut normalized = value.replace("\\r\\n", "\n");
+    normalized = normalized.replace("\\n", "\n");
+    normalized = normalized.replace("\\r", "\r");
+    normalized = normalized.replace("\\t", "\t");
+
+    Cow::Owned(normalized.trim().to_string())
+}
+
+fn try_decrypt_with_private_key(
+    entry: &PrivateKeyEntry,
+    encrypted: &[u8],
+) -> Result<Vec<u8>, String> {
+    match entry.key.decrypt(Oaep::new::<Sha256>(), encrypted) {
+        Ok(data) => Ok(data),
+        Err(err_sha256) => match entry.key.decrypt(Oaep::new::<Sha1>(), encrypted) {
+            Ok(data) => Ok(data),
+            Err(err_sha1) => match entry.key.decrypt(Pkcs1v15Encrypt, encrypted) {
+                Ok(data) => Ok(data),
+                Err(err_pkcs1) => Err(format!(
+                    "{} => OAEP-SHA256: {err_sha256}; OAEP-SHA1: {err_sha1}; PKCS1v15: {err_pkcs1}",
+                    entry.label
+                )),
+            },
+        },
+    }
+}
 
 #[derive(Debug, Error)]
 pub enum OfflineKeyError {
@@ -138,22 +271,26 @@ fn decrypt_license_payload(encoded: &str) -> Result<OfflineLicensePayload, Offli
     let encrypted = general_purpose::STANDARD
         .decode(encoded)
         .map_err(|_| OfflineKeyError::InvalidData("RSA 密文格式无效".into()))?;
-    let decrypted = match PRIVATE_KEY.decrypt(Oaep::new::<Sha256>(), &encrypted) {
-        Ok(data) => data,
-        Err(err_sha256) => match PRIVATE_KEY.decrypt(Oaep::new::<Sha1>(), &encrypted) {
-            Ok(data) => data,
-            Err(err_sha1) => match PRIVATE_KEY.decrypt(Pkcs1v15Encrypt, &encrypted) {
-                Ok(data) => data,
-                Err(err_pkcs1) => {
-                    return Err(OfflineKeyError::Crypto(format!(
-                        "RSA 解密失败: {err_sha256}; {err_sha1}; {err_pkcs1}"
-                    )))
-                }
-            },
-        },
-    };
-    serde_json::from_slice::<OfflineLicensePayload>(&decrypted)
-        .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))
+
+    let mut errors = Vec::new();
+    for entry in PRIVATE_KEYS.iter() {
+        match try_decrypt_with_private_key(entry, &encrypted) {
+            Ok(data) => {
+                return serde_json::from_slice::<OfflineLicensePayload>(&data)
+                    .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))
+            }
+            Err(err) => errors.push(err),
+        }
+    }
+
+    if errors.is_empty() {
+        Err(OfflineKeyError::Crypto("没有可用的 RSA 私钥".into()))
+    } else {
+        Err(OfflineKeyError::Crypto(format!(
+            "RSA 解密失败: {}",
+            errors.join(" | ")
+        )))
+    }
 }
 
 fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> {
@@ -167,31 +304,43 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
     let nonce_array: [u8; 12] = nonce_bytes
         .try_into()
         .map_err(|_| OfflineKeyError::InvalidData("离线时间数据损坏".into()))?;
-    let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
-        .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
-    let nonce = Nonce::from(nonce_array);
-    let plaintext = cipher
-        .decrypt(&nonce, ciphertext)
-        .map_err(|err| OfflineKeyError::Crypto(format!("AES 解密失败: {err}")))?;
-    let time_str = String::from_utf8(plaintext)
-        .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()))?;
-    DateTime::parse_from_rfc3339(&time_str)
-        .map(|dt| dt.with_timezone(&Utc))
-        .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()))
+
+    let mut errors = Vec::new();
+    for entry in AES_KEYS.iter() {
+        match Aes256Gcm::new_from_slice(&entry.key[..]) {
+            Ok(cipher) => match cipher.decrypt(Nonce::from_slice(&nonce_array), ciphertext) {
+                Ok(plaintext) => {
+                    let time_str = String::from_utf8(plaintext)
+                        .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()))?;
+                    return DateTime::parse_from_rfc3339(&time_str)
+                        .map(|dt| dt.with_timezone(&Utc))
+                        .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()));
+                }
+                Err(err) => errors.push(format!("{}: {err}", entry.label)),
+            },
+            Err(err) => errors.push(format!("{}: AES 密钥初始化失败: {err}", entry.label)),
+        }
+    }
+
+    Err(OfflineKeyError::Crypto(format!(
+        "AES 解密失败: {}",
+        errors.join(" | ")
+    )))
 }
 
 fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
-    let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
+    let primary = AES_KEYS
+        .first()
+        .ok_or_else(|| OfflineKeyError::Crypto("没有可用的 AES 密钥".into()))?;
+    let cipher = Aes256Gcm::new_from_slice(&primary.key[..])
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
     let mut nonce_bytes = [0u8; 12];
     OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from(nonce_bytes);
     let ciphertext = cipher
-        .encrypt(&nonce, now.to_rfc3339().as_bytes())
+        .encrypt(Nonce::from_slice(&nonce_bytes), now.to_rfc3339().as_bytes())
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
-    let nonce_bytes: &[u8] = nonce.as_ref();
     let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
-    combined.extend_from_slice(nonce_bytes);
+    combined.extend_from_slice(&nonce_bytes);
     combined.extend_from_slice(&ciphertext);
     Ok(general_purpose::STANDARD.encode(combined))
 }
