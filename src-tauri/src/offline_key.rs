@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::{
+    borrow::Cow,
     convert::TryInto,
     fs,
     path::{Path, PathBuf},
@@ -75,7 +76,8 @@ static PRIVATE_KEYS: Lazy<Vec<PrivateKeyEntry>> = Lazy::new(|| {
     if let Ok(value) = std::env::var(ENV_OFFLINE_RSA_PRIVATE_KEY) {
         let trimmed = value.trim();
         if !trimmed.is_empty() {
-            match RsaPrivateKey::from_pkcs8_pem(trimmed) {
+            let normalized = normalize_pem(trimmed);
+            match RsaPrivateKey::from_pkcs8_pem(normalized.as_ref()) {
                 Ok(key) => entries.push(PrivateKeyEntry {
                     key,
                     label: format!("env:{ENV_OFFLINE_RSA_PRIVATE_KEY}"),
@@ -93,7 +95,8 @@ static PRIVATE_KEYS: Lazy<Vec<PrivateKeyEntry>> = Lazy::new(|| {
             Ok(content) => {
                 let trimmed = content.trim();
                 if !trimmed.is_empty() {
-                    match RsaPrivateKey::from_pkcs8_pem(trimmed) {
+                    let normalized = normalize_pem(trimmed);
+                    match RsaPrivateKey::from_pkcs8_pem(normalized.as_ref()) {
                         Ok(key) => entries.push(PrivateKeyEntry {
                             key,
                             label: format!(
@@ -161,6 +164,21 @@ fn decode_aes_key(value: &str) -> Result<[u8; 32], String> {
     decoded
         .try_into()
         .map_err(|_| String::from("AES key must be 32 bytes for AES-256"))
+}
+
+fn normalize_pem(value: &str) -> Cow<'_, str> {
+    const BACKSLASH: u8 = 92; // '\\'
+
+    if !value.as_bytes().iter().any(|b| *b == BACKSLASH) {
+        return Cow::Borrowed(value);
+    }
+
+    let mut normalized = value.replace("\\r\\n", "\n");
+    normalized = normalized.replace("\\n", "\n");
+    normalized = normalized.replace("\\r", "\r");
+    normalized = normalized.replace("\\t", "\t");
+
+    Cow::Owned(normalized.trim().to_string())
 }
 
 fn try_decrypt_with_private_key(
