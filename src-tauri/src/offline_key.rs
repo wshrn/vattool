@@ -63,19 +63,42 @@ pub const OFFLINE_KEY_SEPARATOR: &str = "|||";
 pub const OFFLINE_KEY_ENV_NAME: &str = "keyzhigongfile";
 
 // 懒加载初始化加密密钥
-static PRIVATE_KEY: Lazy<RsaPrivateKey> =
-    Lazy::new(|| RsaPrivateKey::from_pkcs8_pem(OFFLINE_RSA_PRIVATE_KEY).expect("无效的 RSA 私钥"));
+static PRIVATE_KEY: Lazy<Result<RsaPrivateKey, String>> = Lazy::new(|| {
+    RsaPrivateKey::from_pkcs8_pem(OFFLINE_RSA_PRIVATE_KEY)
+        .map_err(|err| format!("加载 RSA 私钥失败: {err}"))
+});
 
 #[allow(dead_code)]
-static PUBLIC_KEY: Lazy<RsaPublicKey> = Lazy::new(|| {
-    RsaPublicKey::from_public_key_pem(OFFLINE_RSA_PUBLIC_KEY).expect("无效的 RSA 公钥")
+static PUBLIC_KEY: Lazy<Result<RsaPublicKey, String>> = Lazy::new(|| {
+    RsaPublicKey::from_public_key_pem(OFFLINE_RSA_PUBLIC_KEY)
+        .map_err(|err| format!("加载 RSA 公钥失败: {err}"))
 });
 
-static AES_KEY: Lazy<Vec<u8>> = Lazy::new(|| {
+static AES_KEY: Lazy<Result<Vec<u8>, String>> = Lazy::new(|| {
     general_purpose::STANDARD
         .decode(OFFLINE_AES_KEY_B64)
-        .expect("无效的 AES 密钥")
+        .map_err(|err| format!("加载 AES 密钥失败: {err}"))
 });
+
+fn get_private_key() -> Result<&'static RsaPrivateKey, OfflineKeyError> {
+    PRIVATE_KEY
+        .as_ref()
+        .map_err(|err| OfflineKeyError::Crypto(err.clone()))
+}
+
+#[allow(dead_code)]
+fn get_public_key() -> Result<&'static RsaPublicKey, OfflineKeyError> {
+    PUBLIC_KEY
+        .as_ref()
+        .map_err(|err| OfflineKeyError::Crypto(err.clone()))
+}
+
+fn get_aes_key() -> Result<&'static [u8], OfflineKeyError> {
+    AES_KEY
+        .as_ref()
+        .map(|key| key.as_slice())
+        .map_err(|err| OfflineKeyError::Crypto(err.clone()))
+}
 
 #[derive(Error, Debug)]
 pub enum OfflineKeyError {
@@ -204,7 +227,7 @@ fn shorten_hex(hex: String) -> Option<String> {
 }
 
 fn decrypt_license_payload(encoded: &str) -> Result<OfflineLicensePayload, OfflineKeyError> {
-    let private_key = &*PRIVATE_KEY;
+    let private_key = get_private_key()?;
 
     let encrypted = general_purpose::STANDARD
         .decode(encoded)
@@ -237,7 +260,7 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
         .map_err(|_| OfflineKeyError::InvalidData("离线时间数据损坏".into()))?;
     let nonce = Nonce::from(nonce_array);
 
-    let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
+    let cipher = Aes256Gcm::new_from_slice(get_aes_key()?)
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
 
     let plaintext = cipher
@@ -253,7 +276,7 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
 }
 
 fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
-    let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
+    let cipher = Aes256Gcm::new_from_slice(get_aes_key()?)
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
 
     let mut nonce_bytes = [0u8; 12];
@@ -265,8 +288,8 @@ fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
         .encrypt(&nonce, now.to_rfc3339().as_bytes())
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
 
-    let mut combined = Vec::with_capacity(nonce.len() + ciphertext.len());
-    combined.extend_from_slice(nonce.as_slice());
+    let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
+    combined.extend_from_slice(&nonce_bytes);
     combined.extend_from_slice(&ciphertext);
 
     Ok(general_purpose::STANDARD.encode(combined))
