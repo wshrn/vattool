@@ -1,6 +1,5 @@
 use crate::FileWriteLock;
 use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit, Nonce};
-use anyhow::Result;
 use base64::engine::general_purpose;
 use base64::Engine;
 use chrono::{DateTime, Utc};
@@ -9,12 +8,10 @@ use machine_uid::get as get_machine_uid;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use rand::RngCore;
-use rsa::{pkcs1v15::Pkcs1v15Encrypt, pkcs8::DecodePrivateKey, Oaep, RsaPrivateKey};
+use rsa::{pkcs8::DecodePrivateKey, Oaep, RsaPrivateKey};
 use serde::{Deserialize, Serialize};
-use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::{
-    convert::TryInto,
     fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -23,34 +20,34 @@ use thiserror::Error;
 use uuid::Uuid;
 
 const OFFLINE_RSA_PRIVATE_KEY: &str = r"-----BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCydjvCe9dSjiNe
-HYoZsty/TffOevm3B803yOdu3YkP3IFtjTJbQvzXmZjH96E315WccXW0lG3Npjzq
-8n8VJ5t29MNizW9ck3jJoKDzSkXfFtO8e4ergz4PovRLFkh+gKxPC6RoWAm9c2w9
-0/jfsEEiUaVAWw6SXGHDnYVnyrjZp3tz/dqo9enOAseFR2+RkwnIPIpAVZ+UpZ99
-9S2T4vqEkFCftcs4GMjXClQBe0SgQhHK80GDPhlNbwyF5+l0DAViqd0kexmC8b7i
-72aoHh3YeuHbgZ98bAEdR92ynoKQlZd6n3zljZIE8UqY6flnL6yMraV13mVYmKGg
-nEQfy4kxAgMBAAECggEALZBTVKXixWCl9gcLteD9TFifPtgV/p2ezzHbqOol7udJ
-IkvNAhD51iAQqml2f3fq6lzrhPXqjPl3DzNnr+KDZl06r3StDJFYYv5Aaa1aZomA
-+Nv/ORKSm1JrFeq0CpxWof3idYOYxQZ9qdF/drkdACKhUuuMrmCo01VZ9LSE+ojD
-So4rSgQQ9R8FleDyUWxHClyggOjYMV15VVUySaenbtzGQCy0QZeG79IqgqZz1nre
-1f9o2r1r4lbnynuHfYgo6S0gGym3fZJ0dhFhSQgTNLfdvgGWPyc7dkna81ipuWau
-i3Lfr3cWHgpTfkdjUYP1GaqSI/0fQDzVm1BNYfg+AwKBgQDonyUCosm6UjaugPcR
-eIsKCriHnIdzeQQRfHjJeK+eRCbl0nXkH712P7s6V76fgrFAH41hdxQIGVCmKa7Q
-7U+3RoWVcF3LoaEOlc4+AZgOTnSnF1a3mbCSMoGGrMLrvD9+pS7rmf/fWcmrjLkx
-DzAvUkQY8Ztf3P2+NGuYDzzDRwKBgQDEZaxgxsX+EChQDQjBQ5AFNS+ySytt4p1c
-DkDAYVWw9Riz3ZkP3yHLuko0+7RzxoIK3nTdBghaSxQ3SvfGVBWEjF0NbkZP9s/Z
-u28mjFNHHjUKCA3sr6HGLYeR3pzWQLhKW0A/3ZtOPYLj7Lao81SNkPOhZFm808xO
-8CSDfG7bxwKBgQCO4Hi99riKnUaCxil6bJyRrWYLvUOg1BqAlwAlVuAfCGMP08Wf
-OTOIdrqLqismFALEjNysmZQPKWVUudNq9ed5fXI9CEhD82FV8QM9KIN5fgy+OGKF
-4HsIQMc3rdMHMZeaNODtyqfTSnXIzWVN0bNZzWCQJY22QqkDc3UGb411rwKBgCgk
-K9Zf6kniXYr3DwoJWB9oXoZPjOHZxpXxJ9TqUAxqHBFvQoCW955fRhmMNLbRJPU5
-wKMIP57M56XhgcEcoIVF9yLunhpr9NGo2LAFUGQhzW9udAIjZ6pM1f+/g0jbU4+H
-FRu4nKyiL+WMFU105pxEuzcKfrj0hTbBKIVjYnkzAoGBAKl2p8d84so6JcD5RYaC
-clpoYEj6FOPgmhQ9E5BJoBH4epM+c/Vu9JK2fi6XivT5lxH/dWF7B5uf9APUqtf/
-CDlno4vHTRWwc7jcWCjYTr8HkXXk2yZx0O7hmi1Nritj8fDPnZZsjusVcTWjkD2P
-FiGkZG9JMgvYIbk35WnPeiSK
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDVKT08cxtJyhsx
+l9A0+6o7PR5EN12E/gaVXSInY/g9GgTeCcaXBm7FifosFCaVGcvmjJrhxTaNsp/7
+VM+S7jJVfmIYuVnwhhGdis5iJlG8fL2ekG1c1HtShxK7vcrhv8lDrc3zEIbX1v6r
+9sy4T8gZH8peg6dnzmMKHRPhXGscr2SIHn3xsdkP/kCY+4mOsRLdV0IESho0BsNC
+W4smTp4lx9zZKM9Q6DNF62B/2Gd4v+vTixogouQVbSJspTg/AbRx+snZbvX1Fe2d
+I1pFvosWO/rh/K2Wt4PW9KUoQOQXt1WUWIQv5+4FQI82zcRR0BuUf4bfPnUy64ms
+b8cfUA+1AgMBAAECggEAAP1hTitPG/u3iLR3KIeQfq0dmpZ8ED8KS0T2xtgktxUT
+NCGfY2/tkB08yTkZwd2vmW6szCbQ8M8u75K5pjkwPYNeOphG6/AJ3utPIqjE2DM
+e44Imv3ybL5PV5++bucJkZ3JXzjIhBO5k78Ha2ZVvoJqxwuzhfE5SKWziUvfNPZ
+YZpQi6J4UhAY6MV6LR18QHs/8R0ElS5x89y8KeHp4Y0rrxsQTkF7TZcf/IO36yC
+f4Wdbe3Es5zjfyEeKmR9Q0aiVXexMQm35sGRLDYSVX+cQ3c51lHPJWLhBzv3Qgf
+Udcm51Nm2uoDxZ2hxIa9WtSgFRGo4eFse70hSE1EQKBgQD0r9XsWcAweJWx4f7d
+lWRRp2guI0NeedzuqQ6+ew5gSqNtMnQFD31VP0M8Gx+1+nD9G17pNPhn7wiShkJz
+tI8NwScUsfvv1AOJNkyeoLmq3pymC6CW8sbh08uGeRd+7pScGtMEtLOFZOhKs3B
+c7R1yjL+k8IiQOCMG4gTk4sbwKBgQDa1TG7L4bn/BQigL+BKbP7+b6dMSbtn4SS
+12a7xk9QxcYwbgj+oRL1ZkEnEwPaYZXpBOPn0IZLmw+fXNcJakl1QT+PqcRrJv0
+54S1LcwkMZrL0lC7eWZQtt5nqRxXOARFrZRcw4q7th8x8qS2Fum1KwFvLkp+2EG
+/INg/Q0NXwKBgQDsatE4IjO7EwzO592mqWED+FJ/5AUmuSWGubjaGAKf7akIGiY
+Nv7kOXYNgU8Hjh1sMKT5AlSZh4if4+zpmP7r7BcMu915f9e2s9Gok2xgfpv5xKr
+SIachFPnXQXxLGxjyBGPwmRBJcd6pWMK71cp6IbGfv3uQ4ds8I8ylTDewKBgCYD
+3axQYFbbcoRKC5UIQ0gFK6810OcQi+7DKuGB8DIn33ASyNDUdK1+wNGOdhpIaFS
+aC8EXcw5idVO/Fq/vh1p4/k9dCHAxY6Mmkt6hU4+lsFrlq9SRs8K3cAOWqzQtEa
+/OW80z98aZsKmv7pavGswwZlCbSRpV8DpRxpKH9AoGBAJeGbspe/QzuwmMPVRLD
+c+oL2ZqfFKw0vWD1+W5xvrkuGQ6Ob9KEUXO1qPaZkp3pcme0ayifPqEAQ+cvbbm
+ikZgvYcVsFkSV/pfUll+3Z0MMfZ0zBXIR+vZ7Si1P5W4iGuN3m8dMXwNVdmlWMS
+BSXJQZfwmJpL77n0ASk8Joo
 -----END PRIVATE KEY-----";
-const OFFLINE_AES_KEY_B64: &str = "deG64Nsdhem0HpZE2Gm/vj6VE5hGNRDhTsaw/PNxMS8=";
+const OFFLINE_AES_KEY_B64: &str = "94/AR7dd8gIstLEXp3LCs865DptiMKlh8nLjjDEcO40=";
 pub const OFFLINE_KEY_SEPARATOR: &str = "|||";
 pub const OFFLINE_KEY_ENV_NAME: &str = "keyzhigongfile";
 
@@ -135,23 +132,14 @@ fn combine_offline_key(rsa_part: &str, aes_part: &str) -> String {
 }
 
 fn decrypt_license_payload(encoded: &str) -> Result<OfflineLicensePayload, OfflineKeyError> {
+    let private_key = &*PRIVATE_KEY;
     let encrypted = general_purpose::STANDARD
         .decode(encoded)
         .map_err(|_| OfflineKeyError::InvalidData("RSA 密文格式无效".into()))?;
-    let decrypted = match PRIVATE_KEY.decrypt(Oaep::new::<Sha256>(), &encrypted) {
-        Ok(data) => data,
-        Err(err_sha256) => match PRIVATE_KEY.decrypt(Oaep::new::<Sha1>(), &encrypted) {
-            Ok(data) => data,
-            Err(err_sha1) => match PRIVATE_KEY.decrypt(Pkcs1v15Encrypt, &encrypted) {
-                Ok(data) => data,
-                Err(err_pkcs1) => {
-                    return Err(OfflineKeyError::Crypto(format!(
-                        "RSA 解密失败: {err_sha256}; {err_sha1}; {err_pkcs1}"
-                    )))
-                }
-            },
-        },
-    };
+    let padding = Oaep::new::<Sha256>();
+    let decrypted = private_key
+        .decrypt(padding, &encrypted)
+        .map_err(|err| OfflineKeyError::Crypto(format!("RSA 解密失败: {err}")))?;
     serde_json::from_slice::<OfflineLicensePayload>(&decrypted)
         .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))
 }
@@ -164,14 +152,10 @@ fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> 
         return Err(OfflineKeyError::InvalidData("离线时间数据损坏".into()));
     }
     let (nonce_bytes, ciphertext) = combined.split_at(12);
-    let nonce_array: [u8; 12] = nonce_bytes
-        .try_into()
-        .map_err(|_| OfflineKeyError::InvalidData("离线时间数据损坏".into()))?;
     let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
-    let nonce = Nonce::from(nonce_array);
     let plaintext = cipher
-        .decrypt(&nonce, ciphertext)
+        .decrypt(Nonce::from_slice(nonce_bytes), ciphertext)
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 解密失败: {err}")))?;
     let time_str = String::from_utf8(plaintext)
         .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()))?;
@@ -185,13 +169,11 @@ fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
     let mut nonce_bytes = [0u8; 12];
     OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from(nonce_bytes);
     let ciphertext = cipher
-        .encrypt(&nonce, now.to_rfc3339().as_bytes())
+        .encrypt(Nonce::from_slice(&nonce_bytes), now.to_rfc3339().as_bytes())
         .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
-    let nonce_bytes: &[u8] = nonce.as_ref();
     let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
-    combined.extend_from_slice(nonce_bytes);
+    combined.extend_from_slice(&nonce_bytes);
     combined.extend_from_slice(&ciphertext);
     Ok(general_purpose::STANDARD.encode(combined))
 }
@@ -206,20 +188,6 @@ fn build_invalid_result(
         reason: Some(reason),
         expires_at,
         payload,
-    }
-}
-
-fn hash_identifier(data: &[u8]) -> Option<String> {
-    if data.is_empty() {
-        return None;
-    }
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    let hex = format!("{:x}", hasher.finalize());
-    if hex.is_empty() {
-        None
-    } else {
-        Some(hex.chars().take(32).collect())
     }
 }
 
@@ -261,13 +229,35 @@ fn generate_device_id() -> Result<String, OfflineKeyError> {
 
     let fingerprint = hasher.finalize();
     let fingerprint_hex = format!("{:x}", fingerprint);
-    let shortened: String = fingerprint_hex.chars().take(32).collect();
-    if !shortened.is_empty() {
-        return Ok(shortened);
+
+    if let Some(id) = shorten_hex(fingerprint_hex) {
+        return Ok(id);
     }
 
     let uuid = Uuid::new_v4();
     hash_identifier(uuid.as_bytes()).ok_or_else(|| OfflineKeyError::Other("无法生成设备ID".into()))
+}
+
+fn hash_identifier(data: &[u8]) -> Option<String> {
+    if data.is_empty() {
+        return None;
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let hex = format!("{:x}", hasher.finalize());
+    shorten_hex(hex)
+}
+
+fn shorten_hex(hex: String) -> Option<String> {
+    if hex.is_empty() {
+        return None;
+    }
+    let id: String = hex.chars().take(32).collect();
+    if id.is_empty() {
+        None
+    } else {
+        Some(id)
+    }
 }
 
 fn try_validate_from_env(
