@@ -202,7 +202,10 @@ fn initialize_impl(mirror: String) -> Result<PythonEnvStatus> {
 
 fn detect_context() -> DetectionContext {
     let python_dir = detect_python_directory();
-    let scripts_dir = python_dir.as_ref().map(|dir| dir.join("Scripts"));
+    let scripts_dir = python_dir
+        .as_ref()
+        .map(|dir| dir.join("Scripts"))
+        .filter(|path| path.exists());
     let python_env_var = platform::get_env("python3").ok().flatten();
     let path_entries = split_path_entries(&std::env::var("PATH").unwrap_or_default());
     let pip_mirror = detect_pip_mirror();
@@ -229,8 +232,7 @@ fn detect_python_directory() -> Option<PathBuf> {
 
 fn split_path_entries(raw: &str) -> Vec<String> {
     raw.split(';')
-        .map(|entry| entry.trim().trim_matches('"').replace('/', "\\"))
-        .filter(|entry| !entry.is_empty())
+        .filter_map(|entry| normalize_path_entry(entry))
         .collect()
 }
 
@@ -239,7 +241,7 @@ fn join_path_entries(entries: &[String]) -> String {
 }
 
 fn ensure_entry(entries: &mut Vec<String>, path: &Path) -> bool {
-    let value = path.to_string_lossy().replace('/', "\\");
+    let value = normalize_path_from_path(path);
     if entries
         .iter()
         .any(|entry| entry.eq_ignore_ascii_case(&value))
@@ -252,16 +254,44 @@ fn ensure_entry(entries: &mut Vec<String>, path: &Path) -> bool {
 }
 
 fn contains_path(entries: &[String], target: &Path) -> bool {
-    let value = target.to_string_lossy().replace('/', "\\");
+    let value = normalize_path_from_path(target);
     entries
         .iter()
         .any(|entry| entry.eq_ignore_ascii_case(&value))
 }
 
 fn path_equals(entry: &str, target: &Path) -> bool {
-    let normalized = entry.trim().trim_matches('"').replace('/', "\\");
-    let target_value = target.to_string_lossy().replace('/', "\\");
-    normalized.eq_ignore_ascii_case(&target_value)
+    normalize_path_entry(entry)
+        .map(|normalized| normalized.eq_ignore_ascii_case(&normalize_path_from_path(target)))
+        .unwrap_or(false)
+}
+
+fn normalize_path_entry(entry: &str) -> Option<String> {
+    let trimmed = entry.trim().trim_matches('"');
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(normalize_path_text(trimmed))
+    }
+}
+
+fn normalize_path_from_path(path: &Path) -> String {
+    normalize_path_text(&path.to_string_lossy())
+}
+
+fn normalize_path_text(value: &str) -> String {
+    let mut normalized = value.replace('/', "\\");
+    while normalized.ends_with('\\') {
+        let len = normalized.len();
+        if len == 0 {
+            break;
+        }
+        if len == 3 && normalized.as_bytes()[1] == b':' {
+            break;
+        }
+        normalized.pop();
+    }
+    normalized
 }
 
 fn mirror_candidates() -> Vec<MirrorOption> {

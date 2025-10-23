@@ -202,6 +202,13 @@ fn log_validation_failure(reason: &str, payload: Option<&OfflineLicensePayload>)
     }
 }
 
+fn log_validation_success(payload: &OfflineLicensePayload) {
+    println!(
+        "离线密钥校验成功 -> 用户ID: {}, 用户名: {}, 设备ID: {}, 到期时间: {}",
+        payload.user_id, payload.username, payload.device_id, payload.expires_at
+    );
+}
+
 fn build_invalid_result(
     reason: impl Into<String>,
     expires_at: Option<String>,
@@ -295,6 +302,8 @@ async fn try_validate_from_env(
     let updated_aes_part = encrypt_current_time(now)?;
     let updated_raw = combine_offline_key(&rsa_part, &updated_aes_part);
     write_file_with_lock(&env_path, updated_raw.as_bytes(), lock).await?;
+
+    log_validation_success(&payload);
 
     Ok(OfflineKeyValidationResult {
         is_valid: true,
