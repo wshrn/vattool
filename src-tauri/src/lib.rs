@@ -1,15 +1,15 @@
 mod config;
+mod device;
 mod offline_key;
 mod python_env;
+mod storage;
 
-use std::sync::{Arc, Mutex};
-
-pub struct FileWriteLock(pub Arc<Mutex<()>>);
+use config::FileWriteLock;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(FileWriteLock(Arc::new(Mutex::new(()))))
+        .manage(FileWriteLock::default())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             offline_key::validate_offline_key,

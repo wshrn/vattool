@@ -1,11 +1,21 @@
-use crate::FileWriteLock;
 use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Map, Value};
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 use tauri::{Emitter, Manager};
+use tokio::sync::Mutex;
 
 pub const TOOLBOX_THEME_ENV_NAME: &str = "ZHIGONG_TOOLBOX_THEME";
+pub const OFFLINE_KEY_ENV_NAME: &str = "keyzhigongfile";
 const CONFIG_FILE_NAME: &str = "settings.json";
+
+#[derive(Clone)]
+pub struct FileWriteLock(pub Arc<Mutex<()>>);
+
+impl Default for FileWriteLock {
+    fn default() -> Self {
+        Self(Arc::new(Mutex::new(())))
+    }
+}
 
 pub fn ensure_config_dir(app: &tauri::AppHandle) -> Result<()> {
     let path = app
@@ -48,10 +58,8 @@ fn save_config_map(path: &PathBuf, map: &Map<String, Value>) -> Result<()> {
 }
 
 fn with_lock<T>(lock: &FileWriteLock, task: impl FnOnce() -> Result<T>) -> Result<T> {
-    let guard = lock.0.lock().map_err(|_| anyhow!("配置锁已损坏"))?;
-    let result = task();
-    drop(guard);
-    result
+    let _guard = lock.0.blocking_lock();
+    task()
 }
 
 fn sanitize_theme(theme: &str) -> &str {

@@ -1,188 +1,70 @@
-use crate::FileWriteLock;
-
-// 标准库
-use std::convert::TryInto;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-
-// 第三方库 - 加密
-use aes_gcm::aead::Aead;
-use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
-use anyhow::{anyhow, Result as AnyResult};
+use aes_gcm::aead::{Aead, KeyInit};
+use aes_gcm::{Aes256Gcm, Nonce};
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{DateTime, Utc};
-use get_if_addrs::{get_if_addrs, IfAddr};
-use hostname;
-use machine_uid::get as get_machine_uid;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use rand::RngCore;
-use rsa::pkcs8::{DecodePrivateKey, DecodePublicKey};
-use rsa::{Oaep, RsaPrivateKey, RsaPublicKey};
-use serde::{Deserialize, Serialize};
+use rsa::pkcs8::DecodePrivateKey;
+use rsa::{Oaep, RsaPrivateKey};
+use serde::Serialize;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
-use tauri::async_runtime;
-use tauri::State;
+use sha2::Sha256;
+use std::convert::TryFrom;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use thiserror::Error;
-use uuid::Uuid;
+use tokio::sync::Mutex;
 
-// RSA 私钥（2048位）- 用于解密许可证信息
+use crate::config::{FileWriteLock, OFFLINE_KEY_ENV_NAME};
+use crate::device;
+
 const OFFLINE_RSA_PRIVATE_KEY: &str = r"-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC4QLFhLhn4V/pk
-dFIMj9jFnjFbEdnWVCXQ9LXhDtfRWXxawtx0r804MobEd25z8iI/nxJdKpbJs7Tm
-8UHb+uqJ/zfJ2l6jDjkDbDSjV6MWmgnmosFdOTPYPTn2TjVjzWpXB3r9Y5sMSvF0
-/3/1WMWAdhf2Nabeh5eflmSeQ1Uv9C0Q6VXvuFCSn7UoMCDLOHXJNQORpodgiC1p
-7Vl5ZytKtcdcVi5/AcjL/XNIOLJk0n7+unzP1Nla9oKBJgzV2FB9ecuxpArwQ6dQ
-rW9ARXtHQQv4l0q0/j1eI/6HnZvk6f1xuJmQjOE4OWza4Twz6NWzi+2RSrKaCsqX
-/1pQoNMJAgMBAAECggEAKUMPliBBX5ywLdPg1gBWvra0/dyLCJTynQ9YNczhpvff
-weGWhikij529EX1fhmaopc/FSIjzmLr+XaOUqKNR59J4V2NoQyK5wNr4FMZY9wRL
-CFPVcr+PLTNU6iRMj4ueb1v0/o7SV5fm59kZ+kNFg4Wuywvr0TTTT0FaShjxGFo4
-YzErmhh/RZBdcA0JTNUyjbmgwOHoOq9tlxSpHqv0ORMxe8jqDSPexb/Z2c4/Zm2A
-uPugoqwR5nBmBHd426FobuZT0/MKbo3HwP+NZp6RAPVGWRcygWN/E9Y0p6nAWdL+
-tpWUktyRVVIAz1pXBSWyniQxwylHhEiADmgvrpa5qQKBgQDkGIVPQJP9u2rVW1H/
-2Q186jtT9v2skMn0Pj/gqYk1ZWf6ch6q/F9yGDNDenrqiX3W/JmQ5O4HWFwh0ATu
-HJxrqmYwmBrVby0Z0JJG6JS933HtfDMu8QkFOYnEu0X+3eDoPpXSc6xdknT8zVf4
-4vYmKtlPd5MIfae3Ms0OAO9upQKBgQDOyxlvczKjRMEEzoZ0bgMbxoao0ZWWT9K7
-NzP2JofSIyqbxSKYB+YdSX2sAvC4DOwi11OS0q/4VPr8VjnkVPNLq8F/lmlgvBW4
-BW8Tr+z1i34FnV/rpdn7noOp4SlzXSmI2mqYkUv+YteLSJ8IqjMConAcE0NKmfmp
-pk5wyckplQKBgA9HbTaf1sn6Ue+0zEtdGMAzWIIJW3jBwiVwPgsokB5ZipuGJXPC
-sAoOgPCWNcGcMCfEh+ziyOcJDjLdolbo57l2kp3Ssol1hwnhpMrHLZ+CZjlIRo1w
-a/BDqGzbNpcZ+cTU3Ghag0NJWjjM8IWlfmOUHzZphhndgOyOpJm5ilBZAoGAO43u
-Q1SPzslsNTAtNLbCGmuwOEozpFhUvioFwuwRzYjnKnk5n0MXGHQjxzgJj1fZYadV
-oEEhAImoxqcmgQWeE7rhPRdaPcutDZQzCx5tRcHoh0FtcHYRMw/Rp0j7IQhBf/I3
-JL0jf52Dqc8+TcaGbknNs6gwhvmVFzCYAo96aYkCgYEA4wZbjcs008F41+83BatW
-O04wWEGuJEenV+gmmUxP7Zm4bF+PUEFma1A8lODA61//rJZsLqyzcQV9sLxlLTrS
-Q0Ng98hW9rZfgc6Smzz5O5Z9tUEg9FCYSGWwBLq7JIGNtR2qWv0favoMF1Lu1OLW
-tf48SkBaDknGHpihfb3iEnE=
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDVKT08cxtJyhsx
+l9A0+6o7PR5EN12E/gaVXSInY/g9GgTeCcaXBm7FifosFCaVGcvmjJrhxTaNsp/7
+VM+S7jJVfmIYuVnwhhGdis5iJlG8fL2ekG1c1HtShxK7vcrhv8lDrc3zEIbX1v6r
+9sy4T8gZH8peg6dnzmMKHRPhXGscr2SIHn3xsdkP/kCY+4mOsRLdV0IESho0BsNC
+W4smTp4lx9zZKM9Q6DNF62B/2Gd4v+vTixogouQVbSJspTg/AbRx+snZbvX1Fe2d
+I1pFvosWO/rh/K2Wt4PW9KUoQOQXt1WUWIQv5+4FQI82zcRR0BuUf4bfPnUy64ms
+b8cfUA+1AgMBAAECggEAAP1hTitPG/u3iLR3KIeQfq0dmpZ8ED8KS0T2xtgktxUT
+1IwKlui1NIv2rROflgu/DcZe0EDhtJhPlz79EX71W3x+mZBvR0x8dJ1QfzTZy5El
+a+5m4MIpj1V1tgzoeYf4K5yV+RzgWuUmCiCZc9Crqo509We+vI5JX1g2zPMqgSAe
+CEQnPPvXPIPrMeo8fHJuW7OLytuGCzIogYY9vdPeTde7tBn/5FOz9tNhqSxNR1Ru
+2vNvgBsacWNZ0x5aeXLj698RMNm92Ny/ytOdvcYRBtt7677FKZ3GpnDMeB8uHyKF
+3MHm0n1uaXpYJzaYrAPLNFoPt4uWp9uCtCHY5YhbQQKBgQDt/XGFepU/moQXTpKE
+aVKxXtqbqvgEJBdlq9xZ6Z4I3yvVxiVNC08ponHwGUI8XJ/ATR56DiKfIrEyx72o
+RL39AoFaQ6XHwTnk1wgZ2M10HZksFX4SLCYewWesoOwzPYwVu6kLBDZINIw4qdzv
+Et23dLsec3bjDEwgdlVIuBdxlQKBgQDlSsmcO3qUroLwkHSKq5d6lGZA0HWEADcm
+fqb/B4fAtTsG7aaw7mFIiEbkvzG4MdH+lpx+6pOCZPPEwI6RmIjgb9mxpv5Wy0XL
+SOPxYsAjlhdYfZ88ZTueyTBDnd1k1VbLKhC4hNuCEgMI3LfVJv/3GXp0gJu5bGAB
+6kQgFHTdoQKBgBQyoEHNx4DgYjmAJ5spPSVkgXUYq3fegEXWshrHYuwp1JSN/nht
+b0h/SuAvpJlu2vf9E4sUTAfpb9R5czUmsGEap1O7zgQH+BvdzAg1iCpEoM1G/a4Z
+JRsTGvNhrOokXREzHgObVegG3aepcuCvXzXEqGTLM9nNH2DZ6h8D0KmJAoGBAMpZ
+Ucragrcruspp8S9fdvLqe8K/NLYlKoaCRwXRs2/RgCIBIJYMCTZlbYr5X/tZnCS8
+7abjhQIR7T65YBgFMOZATzGEWfhms1VPIjooF8BP+JJTam92N0NN8ZX6fyM5UrtA
+iDkOplkHZD4x6tnk7Qc4KOUfik384k1OXIijBO+BAoGBANmeLjg9ZQicQgNFHUF2
+IHXWLXk7UXEGIGc94fpBs3XJv3Gs33STpdrUZ7HpMxeaNyKT7o3h0gMRfCAWdE+Y
+6+0pcY3LO8xt47mM0fJ4rmO3UtPtRFCB4zfl5LLRXTxMWlDGGeMpkXnTDyepdUer
+ngynrceK8F5b7rIPg7tmoFji
 -----END PRIVATE KEY-----";
-
-// RSA 公钥（2048位）- 用于生成密钥时加密
-const OFFLINE_RSA_PUBLIC_KEY: &str = r"-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuECxYS4Z+Ff6ZHRSDI/Y
-xZ4xWxHZ1lQl0PS14Q7X0Vl8WsLcdK/NODKGxHduc/IiP58SXSqWybO05vFB2/rq
-if83ydpeow45A2w0o1ejFpoJ5qLBXTkz2D059k41Y81qVwd6/WObDErxdP9/9VjF
-gHYX9jWm3oeXn5ZknkNVL/QtEOlV77hQkp+1KDAgyzh1yTUDkaaHYIgtae1ZeWcr
-SrXHXFYufwHIy/1zSDiyZNJ+/rp8z9TZWvaCgSYM1dhQfXnLsaQK8EOnUK1vQEV7
-R0EL+JdKtP49XiP+h52b5On9cbiZkIzhODls2uE8M+jVs4vtkUqymgrKl/9aUKDT
-CQIDAQAB
------END PUBLIC KEY-----";
-
-// AES-256 密钥（Base64 编码）- 用于时间戳加密
 const OFFLINE_AES_KEY_B64: &str = "94/AR7dd8gIstLEXp3LCs865DptiMKlh8nLjjDEcO40=";
+const OFFLINE_KEY_SEPARATOR: &str = "|||";
 
-// 密钥分隔符
-pub const OFFLINE_KEY_SEPARATOR: &str = "|||";
-
-// 环境变量名称
-pub const OFFLINE_KEY_ENV_NAME: &str = "keyzhigongfile";
-
-const OFFLINE_RSA_PRIVATE_KEY_ENV: &str = "ZHIGONG_OFFLINE_RSA_PRIVATE_KEY";
-const OFFLINE_RSA_PRIVATE_KEY_PATH_ENV: &str = "ZHIGONG_OFFLINE_RSA_PRIVATE_KEY_PATH";
-
-// 懒加载初始化加密密钥
-static PRIVATE_KEY: Lazy<Result<RsaPrivateKey, String>> = Lazy::new(|| {
-    let pem = match resolve_private_key_pem() {
-        Ok(value) => value,
-        Err(err) => return Err(err),
-    };
-
-    parse_private_key(&pem)
+static PRIVATE_KEY: Lazy<RsaPrivateKey> = Lazy::new(|| {
+    RsaPrivateKey::from_pkcs8_pem(OFFLINE_RSA_PRIVATE_KEY)
+        .expect("failed to parse offline RSA private key")
 });
 
-#[allow(dead_code)]
-static PUBLIC_KEY: Lazy<Result<RsaPublicKey, String>> = Lazy::new(|| {
-    RsaPublicKey::from_public_key_pem(OFFLINE_RSA_PUBLIC_KEY)
-        .map_err(|err| format!("加载 RSA 公钥失败: {err}"))
-});
-
-static AES_KEY: Lazy<Result<Vec<u8>, String>> = Lazy::new(|| {
-    general_purpose::STANDARD
+static AES_KEY: Lazy<[u8; 32]> = Lazy::new(|| {
+    let bytes = general_purpose::STANDARD
         .decode(OFFLINE_AES_KEY_B64)
-        .map_err(|err| format!("加载 AES 密钥失败: {err}"))
+        .expect("failed to decode offline AES key");
+    bytes
+        .try_into()
+        .expect("invalid offline AES key length: expected 32 bytes")
 });
 
-fn get_private_key() -> Result<&'static RsaPrivateKey, OfflineKeyError> {
-    PRIVATE_KEY
-        .as_ref()
-        .map_err(|err| OfflineKeyError::Crypto(err.clone()))
-}
-
-#[allow(dead_code)]
-fn get_public_key() -> Result<&'static RsaPublicKey, OfflineKeyError> {
-    PUBLIC_KEY
-        .as_ref()
-        .map_err(|err| OfflineKeyError::Crypto(err.clone()))
-}
-
-fn get_aes_key() -> Result<&'static [u8], OfflineKeyError> {
-    AES_KEY
-        .as_ref()
-        .map(|key| key.as_slice())
-        .map_err(|err| OfflineKeyError::Crypto(err.clone()))
-}
-
-fn resolve_private_key_pem() -> Result<String, String> {
-    if let Some(path) = read_env_var(OFFLINE_RSA_PRIVATE_KEY_PATH_ENV) {
-        let path_buf = PathBuf::from(&path);
-        return std::fs::read_to_string(&path_buf)
-            .map_err(|err| format!("无法从 {} 读取 RSA 私钥: {err}", path_buf.display()));
-    }
-
-    if let Some(pem) = read_env_var(OFFLINE_RSA_PRIVATE_KEY_ENV) {
-        return Ok(pem);
-    }
-
-    Ok(OFFLINE_RSA_PRIVATE_KEY.to_string())
-}
-
-fn parse_private_key(pem: &str) -> Result<RsaPrivateKey, String> {
-    let normalized = normalize_private_key_pem(pem);
-    RsaPrivateKey::from_pkcs8_pem(&normalized).map_err(|err| format!("加载 RSA 私钥失败: {err}"))
-}
-
-fn normalize_private_key_pem(pem: &str) -> String {
-    let trimmed = pem.trim();
-    if trimmed.is_empty() {
-        return String::new();
-    }
-
-    if trimmed.contains("-----BEGIN") {
-        trimmed.to_string()
-    } else {
-        let mut wrapped = String::from("-----BEGIN PRIVATE KEY-----\n");
-        wrapped.push_str(trimmed);
-        if !trimmed.ends_with('\n') {
-            wrapped.push('\n');
-        }
-        wrapped.push_str("-----END PRIVATE KEY-----");
-        wrapped
-    }
-}
-
-fn read_env_var(name: &str) -> Option<String> {
-    std::env::var(name)
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-}
-
-#[derive(Error, Debug)]
-pub enum OfflineKeyError {
-    #[error("密钥格式无效: {0}")]
-    InvalidData(String),
-
-    #[error("加密操作失败: {0}")]
-    Crypto(String),
-
-    #[error("文件操作失败: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("JSON 序列化失败: {0}")]
-    Json(#[from] serde_json::Error),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OfflineLicensePayload {
     pub user_id: u32,
@@ -195,8 +77,79 @@ pub struct OfflineLicensePayload {
 
 impl OfflineLicensePayload {
     fn from_value(value: &Value) -> Result<Self, OfflineKeyError> {
-        serde_json::from_value(value.clone())
-            .map_err(|_| OfflineKeyError::InvalidData("许可证数据格式无效".into()))
+        let map = value
+            .as_object()
+            .ok_or_else(|| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
+
+        let user_id = Self::read_user_id(map, &["userId", "user_id"])?;
+        let username = Self::read_string(map, &["username"])?;
+        let email = Self::read_string(map, &["email"])?;
+        let device_id = Self::read_string(map, &["deviceId", "device_id"])?;
+        let expires_at = Self::read_string(map, &["expiresAt", "expires_at"])?;
+        let issued_at = Self::read_string(map, &["issuedAt", "issued_at"])?;
+
+        Ok(Self {
+            user_id,
+            username,
+            email,
+            device_id,
+            expires_at,
+            issued_at,
+        })
+    }
+
+    fn read_user_id(
+        map: &serde_json::Map<String, Value>,
+        keys: &[&str],
+    ) -> Result<u32, OfflineKeyError> {
+        let value = Self::read_value(map, keys)?;
+        if let Some(number) = value.as_u64() {
+            return u32::try_from(number)
+                .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()));
+        }
+
+        if let Some(number) = value.as_i64() {
+            if number < 0 {
+                return Err(OfflineKeyError::InvalidData("离线密钥数据不完整".into()));
+            }
+            return u32::try_from(number as u64)
+                .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()));
+        }
+
+        if let Some(text) = value.as_str() {
+            return text
+                .trim()
+                .parse::<u32>()
+                .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()));
+        }
+
+        Err(OfflineKeyError::InvalidData("离线密钥数据不完整".into()))
+    }
+
+    fn read_string(
+        map: &serde_json::Map<String, Value>,
+        keys: &[&str],
+    ) -> Result<String, OfflineKeyError> {
+        let value = Self::read_value(map, keys)?;
+        if let Some(text) = value.as_str() {
+            if text.trim().is_empty() {
+                return Err(OfflineKeyError::InvalidData("离线密钥数据不完整".into()));
+            }
+            return Ok(text.to_owned());
+        }
+        Err(OfflineKeyError::InvalidData("离线密钥数据不完整".into()))
+    }
+
+    fn read_value<'a>(
+        map: &'a serde_json::Map<String, Value>,
+        keys: &[&str],
+    ) -> Result<&'a Value, OfflineKeyError> {
+        for key in keys {
+            if let Some(value) = map.get(*key) {
+                return Ok(value);
+            }
+        }
+        Err(OfflineKeyError::InvalidData("离线密钥数据不完整".into()))
     }
 }
 
@@ -209,209 +162,75 @@ pub struct OfflineKeyValidationResult {
     pub payload: Option<OfflineLicensePayload>,
 }
 
+#[derive(Debug, Error)]
+enum OfflineKeyError {
+    #[error("离线密钥格式无效")]
+    InvalidFormat,
+    #[error("离线密钥数据无效: {0}")]
+    InvalidData(String),
+    #[error("离线密钥加解密失败: {0}")]
+    Crypto(String),
+    #[error("文件操作失败: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+fn log_validation_failure(reason: &str, payload: Option<&OfflineLicensePayload>) {
+    eprintln!("离线密钥校验失败: {reason}");
+
+    if let Some(payload) = payload {
+        eprintln!(
+            "密钥绑定信息 -> 用户ID: {}, 用户名: {}, 设备ID: {}, 到期时间: {}",
+            payload.user_id, payload.username, payload.device_id, payload.expires_at
+        );
+    }
+
+    match device::get_device_info() {
+        Ok(info) => {
+            eprintln!(
+                "当前设备信息 -> 设备ID: {}, 设备名称: {}, 操作系统: {}, 架构: {}, 主机名: {}, 信息创建时间: {}",
+                info.device_id,
+                info.device_name,
+                info.os,
+                info.arch,
+                info.hostname,
+                info.created_at.to_rfc3339()
+            );
+        }
+        Err(err) => {
+            eprintln!("读取本地设备信息失败: {err}");
+        }
+    }
+}
+
 fn build_invalid_result(
     reason: impl Into<String>,
     expires_at: Option<String>,
     payload: Option<OfflineLicensePayload>,
 ) -> OfflineKeyValidationResult {
+    let reason_text = reason.into();
+    log_validation_failure(&reason_text, payload.as_ref());
     OfflineKeyValidationResult {
         is_valid: false,
-        reason: Some(reason.into()),
+        reason: Some(reason_text),
         expires_at,
         payload,
     }
 }
 
-/// 设备ID生成逻辑（优先级从高到低）
-pub fn generate_device_id() -> AnyResult<String> {
-    if let Ok(machine_id) = get_machine_uid() {
-        if let Some(id) = hash_identifier(machine_id.as_bytes()) {
-            return Ok(id);
-        }
-    }
-
-    let mut hasher = Sha256::new();
-
-    if let Ok(hostname) = hostname::get() {
-        hasher.update(hostname.to_string_lossy().as_bytes());
-    }
-
-    if let Ok(interfaces) = get_if_addrs() {
-        for interface in interfaces {
-            match interface.addr {
-                IfAddr::V4(ifv4) => {
-                    hasher.update(ifv4.ip.octets());
-                    hasher.update(ifv4.netmask.octets());
-                    if let Some(broadcast) = ifv4.broadcast {
-                        hasher.update(broadcast.octets());
-                    }
-                }
-                IfAddr::V6(ifv6) => {
-                    hasher.update(ifv6.ip.octets());
-                    hasher.update(ifv6.netmask.octets());
-                    if let Some(broadcast) = ifv6.broadcast {
-                        hasher.update(broadcast.octets());
-                    }
-                }
+pub async fn validate_from_env(lock: &Arc<Mutex<()>>) -> OfflineKeyValidationResult {
+    match try_validate_from_env(lock).await {
+        Ok(result) => result,
+        Err(error) => {
+            let reason = error.to_string();
+            log_validation_failure(&reason, None);
+            OfflineKeyValidationResult {
+                is_valid: false,
+                reason: Some(reason),
+                expires_at: None,
+                payload: None,
             }
         }
     }
-
-    hasher.update(std::env::consts::OS.as_bytes());
-    hasher.update(std::env::consts::ARCH.as_bytes());
-
-    let fingerprint = hasher.finalize();
-    let fingerprint_hex = format!("{:x}", fingerprint);
-
-    if let Some(id) = shorten_hex(fingerprint_hex) {
-        return Ok(id);
-    }
-
-    let uuid = Uuid::new_v4();
-    hash_identifier(uuid.as_bytes()).ok_or_else(|| anyhow!("无法生成设备ID"))
-}
-
-fn hash_identifier(data: &[u8]) -> Option<String> {
-    if data.is_empty() {
-        return None;
-    }
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    let hex = format!("{:x}", hasher.finalize());
-    shorten_hex(hex)
-}
-
-fn shorten_hex(hex: String) -> Option<String> {
-    if hex.is_empty() {
-        return None;
-    }
-    let id: String = hex.chars().take(32).collect();
-    if id.is_empty() {
-        None
-    } else {
-        Some(id)
-    }
-}
-
-fn decrypt_license_payload(encoded: &str) -> Result<OfflineLicensePayload, OfflineKeyError> {
-    let private_key = get_private_key()?;
-
-    let encrypted = general_purpose::STANDARD
-        .decode(encoded)
-        .map_err(|_| OfflineKeyError::InvalidData("RSA 密文格式无效".into()))?;
-
-    let padding = Oaep::new::<Sha256>();
-    let decrypted = private_key
-        .decrypt(padding, &encrypted)
-        .map_err(|err| OfflineKeyError::Crypto(format!("RSA 解密失败: {err}")))?;
-
-    let value: Value = serde_json::from_slice(&decrypted)
-        .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
-
-    OfflineLicensePayload::from_value(&value)
-}
-
-fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> {
-    let combined = general_purpose::STANDARD
-        .decode(encoded)
-        .map_err(|_| OfflineKeyError::InvalidData("时间密文格式无效".into()))?;
-
-    if combined.len() <= 12 {
-        return Err(OfflineKeyError::InvalidData("离线时间数据损坏".into()));
-    }
-
-    let (nonce_bytes, ciphertext) = combined.split_at(12);
-
-    let nonce_array: [u8; 12] = nonce_bytes
-        .try_into()
-        .map_err(|_| OfflineKeyError::InvalidData("离线时间数据损坏".into()))?;
-    let nonce = Nonce::from(nonce_array);
-
-    let cipher = Aes256Gcm::new_from_slice(get_aes_key()?)
-        .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
-
-    let plaintext = cipher
-        .decrypt(&nonce, ciphertext)
-        .map_err(|err| OfflineKeyError::Crypto(format!("AES 解密失败: {err}")))?;
-
-    let time_str = String::from_utf8(plaintext)
-        .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()))?;
-
-    DateTime::parse_from_rfc3339(&time_str)
-        .map(|dt| dt.with_timezone(&Utc))
-        .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()))
-}
-
-fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
-    let cipher = Aes256Gcm::new_from_slice(get_aes_key()?)
-        .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
-
-    let mut nonce_bytes = [0u8; 12];
-    OsRng.fill_bytes(&mut nonce_bytes);
-
-    let nonce = Nonce::from(nonce_bytes);
-
-    let ciphertext = cipher
-        .encrypt(&nonce, now.to_rfc3339().as_bytes())
-        .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
-
-    let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
-    combined.extend_from_slice(&nonce_bytes);
-    combined.extend_from_slice(&ciphertext);
-
-    Ok(general_purpose::STANDARD.encode(combined))
-}
-
-fn combine_offline_key(rsa_part: &str, aes_part: &str) -> String {
-    format!("{rsa_part}{OFFLINE_KEY_SEPARATOR}{aes_part}")
-}
-
-fn split_offline_key(key: &str) -> Result<(String, String), OfflineKeyError> {
-    let parts: Vec<&str> = key.split(OFFLINE_KEY_SEPARATOR).collect();
-    if parts.len() != 2 {
-        return Err(OfflineKeyError::InvalidData(
-            "密钥格式错误，应包含RSA和AES两部分".into(),
-        ));
-    }
-    Ok((parts[0].to_string(), parts[1].to_string()))
-}
-
-async fn read_file_with_lock(
-    path: &Path,
-    lock: &Arc<Mutex<()>>,
-) -> Result<String, OfflineKeyError> {
-    let path = path.to_path_buf();
-    let lock = Arc::clone(lock);
-
-    async_runtime::spawn_blocking(move || {
-        let _guard = lock
-            .lock()
-            .map_err(|_| OfflineKeyError::InvalidData("获取文件锁失败".into()))?;
-
-        std::fs::read_to_string(path).map_err(OfflineKeyError::Io)
-    })
-    .await
-    .map_err(|err| OfflineKeyError::InvalidData(format!("读取离线密钥失败: {err}")))?
-}
-
-async fn write_file_with_lock(
-    path: &Path,
-    content: &[u8],
-    lock: &Arc<Mutex<()>>,
-) -> Result<(), OfflineKeyError> {
-    let path = path.to_path_buf();
-    let data = content.to_vec();
-    let lock = Arc::clone(lock);
-
-    async_runtime::spawn_blocking(move || {
-        let _guard = lock
-            .lock()
-            .map_err(|_| OfflineKeyError::InvalidData("获取文件锁失败".into()))?;
-
-        std::fs::write(path, data).map_err(OfflineKeyError::Io)
-    })
-    .await
-    .map_err(|err| OfflineKeyError::InvalidData(format!("写入离线密钥失败: {err}")))?
 }
 
 async fn try_validate_from_env(
@@ -442,7 +261,7 @@ async fn try_validate_from_env(
     let payload = decrypt_license_payload(&rsa_part)?;
     let server_time = decrypt_server_time(&aes_part)?;
 
-    let expires_at = DateTime::parse_from_rfc3339(&payload.expires_at)
+    let expires_at = chrono::DateTime::parse_from_rfc3339(&payload.expires_at)
         .map_err(|_| OfflineKeyError::InvalidData("离线密钥到期时间无效".into()))?
         .with_timezone(&Utc);
 
@@ -455,7 +274,7 @@ async fn try_validate_from_env(
         ));
     }
 
-    let device_id = generate_device_id()
+    let device_id = device::get_device_id()
         .map_err(|err| OfflineKeyError::InvalidData(format!("无法获取设备标识: {err}")))?;
     if payload.device_id != device_id {
         return Ok(build_invalid_result(
@@ -485,16 +304,93 @@ async fn try_validate_from_env(
     })
 }
 
+async fn read_file_with_lock(
+    path: &Path,
+    lock: &Arc<Mutex<()>>,
+) -> Result<String, OfflineKeyError> {
+    let _guard = lock.lock().await;
+    let content = tokio::fs::read_to_string(path).await?;
+    Ok(content)
+}
+
+async fn write_file_with_lock(
+    path: &Path,
+    content: &[u8],
+    lock: &Arc<Mutex<()>>,
+) -> Result<(), OfflineKeyError> {
+    let _guard = lock.lock().await;
+    tokio::fs::write(path, content).await?;
+    Ok(())
+}
+
+fn split_offline_key(raw: &str) -> Result<(String, String), OfflineKeyError> {
+    let parts: Vec<&str> = raw.split(OFFLINE_KEY_SEPARATOR).collect();
+    if parts.len() != 2 || parts.iter().any(|part| part.trim().is_empty()) {
+        return Err(OfflineKeyError::InvalidFormat);
+    }
+    Ok((parts[0].to_string(), parts[1].to_string()))
+}
+
+fn decrypt_license_payload(encoded: &str) -> Result<OfflineLicensePayload, OfflineKeyError> {
+    let private_key = &*PRIVATE_KEY;
+    let encrypted = general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|_| OfflineKeyError::InvalidData("RSA 密文格式无效".into()))?;
+    let padding = Oaep::new::<Sha256>();
+    let decrypted = private_key
+        .decrypt(padding, &encrypted)
+        .map_err(|err| OfflineKeyError::Crypto(format!("RSA 解密失败: {err}")))?;
+    let value: Value = serde_json::from_slice(&decrypted)
+        .map_err(|_| OfflineKeyError::InvalidData("离线密钥数据不完整".into()))?;
+    OfflineLicensePayload::from_value(&value)
+}
+
+fn decrypt_server_time(encoded: &str) -> Result<DateTime<Utc>, OfflineKeyError> {
+    let combined = general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|_| OfflineKeyError::InvalidData("时间密文格式无效".into()))?;
+    if combined.len() <= 12 {
+        return Err(OfflineKeyError::InvalidData("离线时间数据损坏".into()));
+    }
+    let (nonce, ciphertext) = combined.split_at(12);
+    let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
+        .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
+    let plaintext = cipher
+        .decrypt(Nonce::from_slice(nonce), ciphertext)
+        .map_err(|err| OfflineKeyError::Crypto(format!("AES 解密失败: {err}")))?;
+    let time_str = String::from_utf8(plaintext)
+        .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()))?;
+    DateTime::parse_from_rfc3339(&time_str)
+        .map(|dt| dt.with_timezone(&Utc))
+        .map_err(|_| OfflineKeyError::InvalidData("服务器时间格式无效".into()))
+}
+
+fn encrypt_current_time(now: DateTime<Utc>) -> Result<String, OfflineKeyError> {
+    let cipher = Aes256Gcm::new_from_slice(&AES_KEY[..])
+        .map_err(|err| OfflineKeyError::Crypto(format!("AES 密钥初始化失败: {err}")))?;
+    let mut nonce_bytes = [0u8; 12];
+    OsRng.fill_bytes(&mut nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(Nonce::from_slice(&nonce_bytes), now.to_rfc3339().as_bytes())
+        .map_err(|err| OfflineKeyError::Crypto(format!("AES 加密失败: {err}")))?;
+    let mut combined = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
+    combined.extend_from_slice(&nonce_bytes);
+    combined.extend_from_slice(&ciphertext);
+    Ok(general_purpose::STANDARD.encode(combined))
+}
+
+fn combine_offline_key(rsa_part: &str, aes_part: &str) -> String {
+    format!("{rsa_part}{OFFLINE_KEY_SEPARATOR}{aes_part}")
+}
+
 #[tauri::command]
 pub async fn validate_offline_key(
-    lock: State<'_, FileWriteLock>,
+    lock: tauri::State<'_, FileWriteLock>,
 ) -> Result<OfflineKeyValidationResult, String> {
-    try_validate_from_env(&lock.0)
-        .await
-        .map_err(|err| err.to_string())
+    Ok(validate_from_env(&lock.0).await)
 }
 
 #[tauri::command]
 pub async fn get_device_id() -> Result<String, String> {
-    generate_device_id().map_err(|err| err.to_string())
+    device::get_device_id().map_err(|err| err.to_string())
 }
