@@ -19,6 +19,18 @@ export interface OfflineKeyValidationResult {
 const isTauriAvailable = () =>
   typeof window !== 'undefined' && Boolean((window as any).__TAURI__)
 
+const logValidationSuccess = (result: OfflineKeyValidationResult) => {
+  const payload = result.payload
+  if (payload) {
+    const expiresAt = result.expiresAt ?? payload.expiresAt ?? '未知'
+    console.info(
+      `离线密钥校验成功：用户 ${payload.username} (ID: ${payload.userId})，设备 ${payload.deviceId}，到期时间 ${expiresAt}`,
+    )
+  } else {
+    console.info('离线密钥校验成功')
+  }
+}
+
 const showAuthError = async (content: string) => {
   if (!isTauriAvailable()) {
     alert(content)
@@ -69,6 +81,7 @@ export const ensureOfflineLicense = async (): Promise<boolean> => {
       await exitApp()
       return false
     }
+    logValidationSuccess(result)
     return true
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
