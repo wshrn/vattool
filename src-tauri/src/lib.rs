@@ -5,6 +5,9 @@ mod python_env;
 mod storage;
 
 use config::FileWriteLock;
+use tauri::Manager;
+
+use std::process;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,6 +26,22 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle();
             config::ensure_config_dir(&handle)?;
+
+            let lock_state: tauri::State<'_, FileWriteLock> = app.state();
+            let lock = lock_state.0.clone();
+            drop(lock_state);
+
+            let validation = tauri::async_runtime::block_on(async {
+                offline_key::validate_from_env(&lock).await
+            });
+
+            if !validation.is_valid {
+                let reason = validation
+                    .reason
+                    .unwrap_or_else(|| String::from("离线密钥认证失败"));
+                eprintln!("离线密钥认证失败：{reason}");
+                process::exit(1);
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
