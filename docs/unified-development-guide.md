@@ -1302,6 +1302,12 @@ const startDragging = async (event: MouseEvent) => {
 </script>
 ```
 
+#### 行为说明
+
+* 通过 `data-tauri-drag-region` 与 `appWindow.startDragging()` 的组合，使整个标题栏都可用于拖拽窗口；按钮区域再显式设置 `data-tauri-drag-region="false"`，避免用户点击控件时触发拖拽。
+* `startDragging` 仅在鼠标左键按下时触发，异常会记录在控制台中，方便定位平台层面的问题。
+* 依赖 `@tauri-apps/api/window`，因此在 Tauri 配置中需开启无装饰窗口（`tauri.conf.json > tauri > windows[*].decorations = false`），才能完全替代系统默认标题栏。
+
 ### `src/components/WindowControls.vue`
 
 ```vue
@@ -1431,6 +1437,13 @@ const closeWindow = async () => {
 }
 </script>
 ```
+
+#### 行为说明
+
+* `minimize`、`toggleMaximize` 与 `closeWindow` 分别映射 Tauri 的窗口 API，对应系统最小化、最大化/还原与关闭操作。所有操作都使用 `@click.stop.prevent`，避免冒泡影响拖拽区域。
+* `toggleMaximize` 调用了 `appWindow.isMaximized()` 来判断当前窗口状态，并在成功后刷新本地状态，使图标与系统状态保持一致。
+* 为了同步来自原生菜单或快捷键的最大化/还原事件，组件在挂载时注册 `onResized`、`onMaximize` 与 `onUnmaximize` 监听，并在卸载时逐一清理，防止内存泄漏。
+* 控件图标使用 Heroicons Outline 套件，可根据品牌要求替换为定制 SVG；无论替换与否，都应保留 `@mousedown.stop`，避免在按下按钮开始拖拽。
 
 ### `src/components/MirrorSelectDropdown.vue`
 
@@ -2125,6 +2138,25 @@ void bootstrap()
 
 ## 后端配置与主题持久化
 
+离线认证链路在桌面端启动阶段会优先读取一组环境变量来确定主题与密钥文件位置：
+
+- `ZHIGONG_TOOLBOX_THEME`：可选值 `light`、`dark`、`auto`，用于覆盖持久化配置中的主题。若未设置则回退到 `settings.json`。
+- `keyzhigongfile`：**必须**指向离线授权文件的绝对路径，后端会在构建应用时通过 `OFFLINE_KEY_ENV_NAME` 常量读取该变量。如果缺失或者为空，应用会在 `tauri::Builder::setup` 阶段直接退出并提示“环境变量 keyzhigongfile 未设置”。
+
+在开发与测试时，请务必先将密钥文件放置在安全目录中，并在启动前设置环境变量。例如：
+
+```powershell
+$env:keyzhigongfile = "C:\\secure\\offline-license.key"
+pnpm tauri dev
+```
+
+或在类 Unix 系统：
+
+```bash
+export keyzhigongfile="$HOME/.config/vattool/offline-license.key"
+pnpm tauri dev
+```
+
 ### `src-tauri/src/lib.rs`
 
 ```rust
@@ -2188,8 +2220,8 @@ use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 use tauri::{Emitter, Manager};
 use tokio::sync::Mutex;
 
-pub const APP_THEME_ENV_NAME: &str = "APP_THEME_MODE";
-pub const APP_OFFLINE_KEY_ENV_NAME: &str = "APP_OFFLINE_KEY_PATH";
+pub const TOOLBOX_THEME_ENV_NAME: &str = "ZHIGONG_TOOLBOX_THEME";
+pub const OFFLINE_KEY_ENV_NAME: &str = "keyzhigongfile";
 const CONFIG_FILE_NAME: &str = "settings.json";
 
 #[derive(Clone)]
@@ -2258,7 +2290,7 @@ pub fn tool_read_theme(
     app: tauri::AppHandle,
     lock: tauri::State<FileWriteLock>,
 ) -> Result<String, String> {
-    if let Ok(value) = std::env::var(APP_THEME_ENV_NAME) {
+    if let Ok(value) = std::env::var(TOOLBOX_THEME_ENV_NAME) {
         return Ok(sanitize_theme(value.trim()).to_string());
     }
 
@@ -2323,7 +2355,7 @@ fn sync_theme_env_impl(value: &str) -> Result<()> {
     let sanitized = sanitize_theme(value);
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (env, _) = hkcu.create_subkey("Environment")?;
-    env.set_value(APP_THEME_ENV_NAME, &sanitized)?;
+    env.set_value(TOOLBOX_THEME_ENV_NAME, &sanitized)?;
 
     unsafe {
         let param = w!("Environment");
@@ -2343,10 +2375,65 @@ fn sync_theme_env_impl(value: &str) -> Result<()> {
 
 #[cfg(not(target_os = "windows"))]
 fn sync_theme_env_impl(value: &str) -> Result<()> {
-    std::env::set_var(APP_THEME_ENV_NAME, sanitize_theme(value));
+    std::env::set_var(TOOLBOX_THEME_ENV_NAME, sanitize_theme(value));
     Ok(())
 }
 ```
+
+### 编译期图标准备（`src-tauri/build.rs`）
+
+为了避免在仓库中提交二进制图标文件，构建脚本会在编译阶段自动从远程镜像下载应用图标并写入 `icons/app-icon.ico`。若主源站不可达，会依次尝试备用地址，并在全部失败时给出 `cargo:warning`。
+
+```rust
+use std::fs;
+use std::io::Write;
+use std::path::Path;
+
+fn main() {
+    if let Err(err) = ensure_icon() {
+        println!("cargo:warning=failed to prepare icon: {err}");
+    }
+    tauri_build::build();
+}
+
+fn ensure_icon() -> Result<(), Box<dyn std::error::Error>> {
+    const ICON_URLS: &[&str] = &[
+        "https://www.python.org/static/favicon.ico",
+        "https://raw.githubusercontent.com/python/cpython/main/Misc/python.ico",
+    ];
+
+    let icon_dir = Path::new("icons");
+    fs::create_dir_all(icon_dir)?;
+    let icon_path = icon_dir.join("app-icon.ico");
+
+    for url in ICON_URLS {
+        match download_icon(url, &icon_path) {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                println!("cargo:warning=failed to download icon from {url}: {err}");
+            }
+        }
+    }
+
+    Err("all icon download mirrors failed".into())
+}
+
+fn download_icon(url: &str, destination: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let response = ureq::get(url).call()?;
+    let status = response.status();
+    if !(200..=299).contains(&status) {
+        return Err(format!("download failed with status {}", status).into());
+    }
+    let mut reader = response.into_reader();
+    let mut buf = Vec::new();
+    std::io::copy(&mut reader, &mut buf)?;
+    let mut file = fs::File::create(destination)?;
+    file.write_all(&buf)?;
+    Ok(())
+}
+```
+
+> 💡 如果公司网络限制访问外网，可根据需要在 `ICON_URLS` 中追加镜像地址，或预先在 CI 中下载文件后设置 `icons/app-icon.ico` 缓存目录。
 
 ## 离线密钥认证核心逻辑（后端）
 
@@ -2371,7 +2458,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::Mutex;
 
-use crate::config::{FileWriteLock, APP_OFFLINE_KEY_ENV_NAME};
+use crate::config::{FileWriteLock, OFFLINE_KEY_ENV_NAME};
 use crate::device;
 
 const OFFLINE_RSA_PRIVATE_KEY: &str = r"-----BEGIN PRIVATE KEY-----
@@ -2598,11 +2685,11 @@ pub async fn validate_from_env(lock: &Arc<Mutex<()>>) -> OfflineKeyValidationRes
 async fn try_validate_from_env(
     lock: &Arc<Mutex<()>>,
 ) -> Result<OfflineKeyValidationResult, OfflineKeyError> {
-    let env_path = match std::env::var(APP_OFFLINE_KEY_ENV_NAME) {
+    let env_path = match std::env::var(OFFLINE_KEY_ENV_NAME) {
         Ok(value) => PathBuf::from(value),
         Err(_) => {
             return Ok(build_invalid_result(
-                format!("环境变量 {APP_OFFLINE_KEY_ENV_NAME} 未设置"),
+                format!("环境变量 {OFFLINE_KEY_ENV_NAME} 未设置"),
                 None,
                 None,
             ));
