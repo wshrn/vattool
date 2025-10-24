@@ -207,7 +207,9 @@ fn detect_context() -> DetectionContext {
         .map(|dir| dir.join("Scripts"))
         .filter(|path| path.exists());
     let python_env_var = platform::get_env("python3").ok().flatten();
-    let path_entries = split_path_entries(&std::env::var("PATH").unwrap_or_default());
+    let path_entries = platform::get_user_path()
+        .map(|value| split_path_entries(&value))
+        .unwrap_or_else(|_| split_path_entries(&std::env::var("PATH").unwrap_or_default()));
     let pip_mirror = detect_pip_mirror();
 
     DetectionContext {
