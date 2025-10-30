@@ -133,10 +133,7 @@ fn collect_status() -> Result<PythonEnvStatus> {
         Some(dir) if contains_path(&context.path_entries, dir) => {
             status_ok("PATH 中包含当前 Python 目录", None)
         }
-        Some(dir) => status_err(
-            "PATH 未包含当前 Python 目录",
-            Some(format!("期望目录：{}", dir.display())),
-        ),
+        Some(_dir) => status_err("PATH 未包含当前 Python 目录", None),
         None => status_err("未检测到 Python 目录，无法校验 PATH", None),
     };
 
@@ -144,10 +141,7 @@ fn collect_status() -> Result<PythonEnvStatus> {
         Some(dir) if contains_path(&context.path_entries, dir) => {
             status_ok("PATH 中包含 Scripts 目录", None)
         }
-        Some(dir) => status_err(
-            "PATH 未包含 Scripts 目录",
-            Some(format!("期望目录：{}", dir.display())),
-        ),
+        Some(_dir) => status_err("PATH 未包含 Scripts 目录", None),
         None => status_err("未检测到 Scripts 目录，无法校验 PATH", None),
     };
 
