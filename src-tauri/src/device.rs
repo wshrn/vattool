@@ -1,12 +1,8 @@
-use crate::storage;
 use anyhow::{anyhow, Result};
 use get_if_addrs::{get_if_addrs, IfAddr};
 use machine_uid::get as get_machine_uid;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::fs;
-use std::path::PathBuf;
-use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeviceInfo {
@@ -19,14 +15,7 @@ pub struct DeviceInfo {
 }
 
 pub fn get_device_id() -> Result<String> {
-    if let Ok(existing_id) = load_device_id() {
-        return Ok(existing_id);
-    }
-
-    let device_id = generate_device_id()?;
-    save_device_id(&device_id)?;
-
-    Ok(device_id)
+    generate_device_id()
 }
 
 fn generate_device_id() -> Result<String> {
@@ -74,44 +63,7 @@ fn generate_device_id() -> Result<String> {
         return Ok(id);
     }
 
-    let uuid = Uuid::new_v4();
-    hash_identifier(uuid.as_bytes()).ok_or_else(|| anyhow!("无法生成设备ID"))
-}
-
-fn load_device_id() -> Result<String> {
-    let config_path = get_device_config_path()?;
-    let content = fs::read_to_string(config_path)?;
-    let device_info: DeviceInfo = serde_json::from_str(&content)?;
-    Ok(device_info.device_id)
-}
-
-fn save_device_id(device_id: &str) -> Result<()> {
-    let config_path = get_device_config_path()?;
-
-    if let Some(parent) = config_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    let device_info = DeviceInfo {
-        device_id: device_id.to_string(),
-        device_name: get_device_name()?,
-        os: std::env::consts::OS.to_string(),
-        arch: std::env::consts::ARCH.to_string(),
-        hostname: hostname::get()
-            .map(|h| h.to_string_lossy().to_string())
-            .unwrap_or_else(|_| "Unknown".to_string()),
-        created_at: chrono::Utc::now(),
-    };
-
-    let content = serde_json::to_string_pretty(&device_info)?;
-    fs::write(config_path, content)?;
-
-    Ok(())
-}
-
-fn get_device_config_path() -> Result<PathBuf> {
-    let config_dir = storage::get_app_config_dir()?;
-    Ok(config_dir.join("device.json"))
+    Err(anyhow!("无法生成稳定的设备ID"))
 }
 
 fn get_device_name() -> Result<String> {
@@ -155,14 +107,14 @@ fn shorten_hex(hex: String) -> Option<String> {
 }
 
 pub fn get_device_info() -> Result<DeviceInfo> {
-    let config_path = get_device_config_path()?;
-
-    if config_path.exists() {
-        let content = fs::read_to_string(config_path)?;
-        let device_info: DeviceInfo = serde_json::from_str(&content)?;
-        Ok(device_info)
-    } else {
-        let _device_id = get_device_id()?;
-        get_device_info()
-    }
+    Ok(DeviceInfo {
+        device_id: get_device_id()?,
+        device_name: get_device_name()?,
+        os: std::env::consts::OS.to_string(),
+        arch: std::env::consts::ARCH.to_string(),
+        hostname: hostname::get()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "Unknown".to_string()),
+        created_at: chrono::Utc::now(),
+    })
 }
